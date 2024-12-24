@@ -1,0 +1,14 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    uses: github.com/Mad-Pixels/github-workflows/.github/workflows/rust-check.yml@main
+    with:
+      working-directory: "actions"
+      binaries: '["terraform", "other-binary"]'
