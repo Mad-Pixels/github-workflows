@@ -12,7 +12,6 @@ jobs:
     name: Rust ${{ matrix.check.name }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         check:
           - name: Tests
@@ -21,6 +20,11 @@ jobs:
             cmd: fmt
           - name: Clippy
             cmd: clippy
+      fail-fast: false
+    env:
+      MATRIX_CONTEXT: Rust Checks
+      JOB_NAME: ${{ matrix.check.name }}
+
     steps:
       - uses: actions/checkout@v3
 
