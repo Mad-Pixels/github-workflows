@@ -26,32 +26,29 @@ on:
         default: ""
 
 jobs:
-  # 1) Проверки на push (кроме main) и на PR (кроме main)
   check:
     if: >
       (github.event_name == 'push' && github.ref != 'refs/heads/main')
       || (github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'main')
-    uses: Mad-Pixels/github-workflows/.github/workflows/rust-check.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-check.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
 
-  # 2) Сборка только для PR в main
   build:
     if: >
       (github.event_name == 'pull_request')
       && (github.event.pull_request.base.ref == 'main')
     needs: [check]
-    uses: Mad-Pixels/github-workflows/.github/workflows/rust-build.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-build.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ inputs.binaries }}
 
-  # 3) Релиз только при push в main
   release:
     if: >
       (github.event_name == 'push')
       && (github.ref == 'refs/heads/main')
-    uses: Mad-Pixels/github-workflows/.github/workflows/rust-release.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-release.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ inputs.binaries }}
