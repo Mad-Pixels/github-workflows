@@ -1,3 +1,4 @@
+# rust-ci.yml
 name: Rust CI
 
 on:
@@ -15,10 +16,11 @@ on:
         required: true
         type: string
         description: "Directory containing Rust project"
-      binaries:
-        required: true
+      binaries-dictionary:
+        required: false
         type: string
-        description: "JSON array of binary names to build"
+        description: "Directory containing sources for build"
+        default: "./bin"
       version:
         required: false
         type: string
@@ -34,15 +36,29 @@ jobs:
     with:
       working-directory: ${{ inputs.working-directory }}
 
+  discover:
+    if: >
+      github.event_name == 'pull_request' 
+      && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      binaries: ${{ steps.discover-binaries.outputs.binaries }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: discover-binaries
+        run: |
+          BINARIES=$(ls ${{ inputs.working-directory }}/${{ .inputs.binaries-dictionary }} | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "binaries=$BINARIES" >> "$GITHUB_OUTPUT"
+
   build:
     if: >
-      (github.event_name == 'pull_request')
-      && (github.event.pull_request.base.ref == 'main')
-    needs: [check]
+      github.event_name == 'pull_request'
+      && github.event.pull_request.base.ref == 'main'
+    needs: [check, discover]
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
-      binaries: ${{ inputs.binaries }}
+      binaries: ${{ needs.discover.outputs.binaries }}
 
   release:
     if: >
@@ -51,5 +67,5 @@ jobs:
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-release.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
-      binaries: ${{ inputs.binaries }}
+      binaries: ${{ needs.discover.outputs.binaries }}
       version: ${{ inputs.version }}
