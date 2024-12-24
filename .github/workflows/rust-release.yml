@@ -1,0 +1,82 @@
+name: Rust Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: "Release version (e.g. v1.0.0)"
+      binaries:
+        required: true
+        type: string
+        description: "JSON array of binary names"
+      working-directory:
+        required: true
+        type: string
+        description: "Directory containing Rust project"
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse binary names
+        id: parse-binaries
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const binaries = JSON.parse('${{ inputs.binaries }}');
+            const platforms = [
+              { platform: 'linux', arch: 'amd64' },
+              { platform: 'linux', arch: 'arm' },
+              { platform: 'darwin', arch: 'arm' }
+            ];
+            
+            // Создаем массив всех комбинаций бинарей и платформ
+            const artifacts = binaries.flatMap(binary => 
+              platforms.map(p => ({
+                name: `${binary}_${p.platform}_${p.arch}`,
+                binary
+              }))
+            );
+            
+            core.setOutput('artifacts', JSON.stringify(artifacts));
+
+      # Скачиваем все артефакты
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ inputs.version }}
+          release_name: Release ${{ inputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/github-script@v6
+        env:
+          RELEASE_ID: ${{ steps.create_release.outputs.id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const artifacts = JSON.parse('${{ steps.parse-binaries.outputs.artifacts }}');
+            
+            for (const artifact of artifacts) {
+              const artifactPath = `artifacts/${artifact.name}/action-${artifact.binary}`;
+              if (fs.existsSync(artifactPath)) {
+                await github.rest.repos.uploadReleaseAsset({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  release_id: process.env.RELEASE_ID,
+                  name: `action-${artifact.binary}-${artifact.name}`,
+                  data: fs.readFileSync(artifactPath)
+                });
+              }
+            }
