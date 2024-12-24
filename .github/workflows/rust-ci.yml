@@ -1,6 +1,14 @@
 name: Rust CI
 
 on:
+  push:
+    branches: [ "**" ]
+    paths:
+      - "**.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+  pull_request:
+    branches: [ "**" ]
   workflow_call:
     inputs:
       working-directory:
@@ -16,46 +24,35 @@ on:
         type: string
         description: "Release version (only for release)"
         default: ""
-  push:
-    branches: [ "**" ]
-    paths:
-      - "**.rs"
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
-  pull_request:
-    branches: [ "**" ]
 
 jobs:
   # 1) Проверки на push (кроме main) и на PR (кроме main)
   check:
     if: >
-      (github.event_name == 'push' AND github.ref != 'refs/heads/main')
-      OR
-      (github.event_name == 'pull_request' AND github.event.pull_request.base.ref != 'main')
+      (github.event_name == 'push' && github.ref != 'refs/heads/main')
+      || (github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'main')
     uses: Mad-Pixels/github-workflows/.github/workflows/rust-check.yml@dev
     with:
-      working-directory: "${{ inputs.working-directory }}"
+      working-directory: ${{ inputs.working-directory }}
 
   # 2) Сборка только для PR в main
   build:
     if: >
-      github.event_name == 'pull_request'
-      AND
-      github.event.pull_request.base.ref == 'main'
+      (github.event_name == 'pull_request')
+      && (github.event.pull_request.base.ref == 'main')
     needs: [check]
     uses: Mad-Pixels/github-workflows/.github/workflows/rust-build.yml@dev
     with:
-      working-directory: "${{ inputs.working-directory }}"
-      binaries: "${{ inputs.binaries }}"
+      working-directory: ${{ inputs.working-directory }}
+      binaries: ${{ inputs.binaries }}
 
   # 3) Релиз только при push в main
   release:
     if: >
-      github.event_name == 'push'
-      AND
-      github.ref == 'refs/heads/main'
+      (github.event_name == 'push')
+      && (github.ref == 'refs/heads/main')
     uses: Mad-Pixels/github-workflows/.github/workflows/rust-release.yml@dev
     with:
-      working-directory: "${{ inputs.working-directory }}"
-      binaries: "${{ inputs.binaries }}"
-      version: "${{ inputs.version }}"
+      working-directory: ${{ inputs.working-directory }}
+      binaries: ${{ inputs.binaries }}
+      version: ${{ inputs.version }}
