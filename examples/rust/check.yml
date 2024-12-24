@@ -1,14 +1,7 @@
-name: CI
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+name: Commit
 
 jobs:
   check:
-    uses: github.com/Mad-Pixels/github-workflows/.github/workflows/rust-check.yml@main
+    uses: Mad-Pixels/github-workflows/.github/workflows/rust-check.yml@main
     with:
-      working-directory: "./"
-  
+      working-directory: "./actions"

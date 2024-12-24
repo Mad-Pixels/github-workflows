@@ -11,6 +11,12 @@ on:
         required: true
         type: string
         description: "JSON array of binary names to build"
+  
+  pull_request:
+    paths:
+      - '**.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
 
 jobs:
   build:
