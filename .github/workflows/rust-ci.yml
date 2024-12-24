@@ -30,7 +30,7 @@ jobs:
     if: >
       (github.event_name == 'push' && github.ref != 'refs/heads/main')
       || (github.event_name == 'pull_request' && github.event.pull_request.base.ref != 'main')
-    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-check.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/_rust-check.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
 
@@ -39,7 +39,7 @@ jobs:
       (github.event_name == 'pull_request')
       && (github.event.pull_request.base.ref == 'main')
     needs: [check]
-    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-build.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ inputs.binaries }}
@@ -48,7 +48,7 @@ jobs:
     if: >
       (github.event_name == 'push')
       && (github.ref == 'refs/heads/main')
-    uses: Mad-Pixels/github-workflows/.github/workflows/internal/rust-release.yml@dev
+    uses: Mad-Pixels/github-workflows/.github/workflows/_rust-release.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ inputs.binaries }}
