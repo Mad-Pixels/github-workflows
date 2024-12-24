@@ -12,12 +12,6 @@ on:
         type: string
         description: "JSON array of binary names to build"
   
-  pull_request:
-    paths:
-      - '**.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}

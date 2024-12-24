@@ -8,12 +8,6 @@ on:
         type: string
         description: "Directory containing Rust project (Cargo.toml)"
   
-  push:
-    paths:
-      - '**.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-
 jobs:
   check:
     runs-on: ubuntu-latest
