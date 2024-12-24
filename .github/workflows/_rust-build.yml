@@ -1,16 +1,16 @@
 name: Rust Build
 
 on:
- workflow_call:
-   inputs:
-     working-directory:
-       required: true
-       type: string
-       description: "Directory containing Rust project"
-     binaries:
-       required: true
-       type: string
-       description: "JSON array of binary names to build"
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
+        description: "Directory containing Rust project"
+      binaries:
+        required: true
+        type: string
+        description: "JSON array of binary names to build"
  
 jobs:
   build:
