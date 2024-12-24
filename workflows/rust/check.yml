@@ -1,0 +1,39 @@
+name: Rust Check
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: true
+        type: string
+        description: "Directory containing Rust project (Cargo.toml)"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [test, fmt, clippy]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Run ${{ matrix.check }}
+        run: |
+          cd ${{ inputs.working-directory }}
+          case ${{ matrix.check }} in
+            test)
+              cargo test
+              ;;
+            fmt)
+              cargo fmt --all -- --check
+              ;;
+            clippy)
+              cargo clippy -- -D warnings
+              ;;
+          esac
