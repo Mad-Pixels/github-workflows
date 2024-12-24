@@ -11,5 +11,5 @@ jobs:
     uses: Mad-Pixels/github-workflows/.github/workflows/rust-ci.yml@dev
     with:
       working-directory: "actions"
-      binaries: '["terraform", "other-binary"]'
+      binaries: '["first-binary", "second-binary"]'
       version: ${{ github.event.head_commit.message }}
