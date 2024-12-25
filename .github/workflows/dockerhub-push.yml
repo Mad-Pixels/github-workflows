@@ -50,29 +50,30 @@ jobs:
         with:
           path: ./images
 
-      - uses: docker/login-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
-      - name: Load and push images
+      - name: Load and Push Images
         run: |
           # Load all saved images from artifacts
           for TARBALL in ./images/*/*.tar; do
             echo "Loading $TARBALL..."
             docker load -i "$TARBALL"
           done
-  
+
           # Create multi-platform builder for manifest
           docker buildx create --name multi-builder --use || true
-            
+          
           # Create and push manifest combining all platform-specific images
           MANIFEST_TAG="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.repository }}:${{ inputs.tag }}"
           docker buildx imagetools create --tag "$MANIFEST_TAG" \
             "${MANIFEST_TAG}-linux/amd64" \
             "${MANIFEST_TAG}-linux/arm64"
-  
