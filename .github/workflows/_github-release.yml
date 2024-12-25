@@ -1,4 +1,4 @@
-# .github/workflows/github-release.yml
+# .github/workflows/_github-release.yml
 name: GitHub Release
 
 on:
@@ -10,16 +10,19 @@ on:
       working-directory:
         required: true
         type: string
+      binaries:
+        required: true
+        type: string
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Download build artifact
+      - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          name: build-output
-          path: build-artifacts
+          name: binaries
+          path: artifacts
 
       - name: Create release
         id: create_release
@@ -41,13 +44,27 @@ jobs:
 
       - name: Upload release files
         run: |
-          UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
+          ARTIFACTS='${{ inputs.binaries }}'
+          if [ -z "$ARTIFACTS" ]; then
+            echo "No binaries JSON provided"
+            exit 1
+          fi
+
+          URL=${{ steps.create_release.outputs.upload_url }}
           TOKEN=${{ secrets.GITHUB_TOKEN }}
-          find build-artifacts -type f | while read file; do
-            fname=$(basename "$file")
-            echo "Uploading $fname"
-            curl -X POST "$UPLOAD_URL?name=$fname" \
-              -H "Authorization: Bearer $TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$file"
+
+          for bin in $(echo "$ARTIFACTS" | jq -r '.[]'); do
+            for plat_arch in linux_amd64 linux_arm darwin_arm; do
+              FILE_PATH="artifacts/${bin}_${plat_arch}/action-${bin}"
+              FILE_NAME="action-${bin}-${plat_arch}"
+              if [ -f "$FILE_PATH" ]; then
+                echo "Uploading $FILE_NAME"
+                curl -X POST "$URL?name=$FILE_NAME" \
+                  -H "Authorization: Bearer $TOKEN" \
+                  -H "Content-Type: application/octet-stream" \
+                  --data-binary "@$FILE_PATH"
+              else
+                echo "Missing $FILE_PATH"
+              fi
+            done
           done

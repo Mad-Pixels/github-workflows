@@ -1,3 +1,4 @@
+# .github/workflows/_rust-build.yml
 name: Rust Build
 
 on:
@@ -42,8 +43,8 @@ jobs:
             if (!raw) {
               throw new Error('No binaries JSON provided');
             }
-            const bins = JSON.parse(raw);
-            core.setOutput('binaries', JSON.stringify(bins));
+            const arr = JSON.parse(raw);
+            core.setOutput('binaries', JSON.stringify(arr));
 
       - name: Install
         run: |
@@ -53,13 +54,12 @@ jobs:
             fi
           else
             rustup target add ${{ matrix.target }}
-          fi
 
       - name: Build
         run: |
           cd ${{ inputs.working-directory }}
-          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
-          for bin in $(echo "$BJSON" | jq -r '.[]'); do
+          PARSED='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$PARSED" | jq -r '.[]'); do
             if [ "${{ matrix.platform }}" = "linux" ]; then
               cross build --release --target ${{ matrix.target }} -p action-${bin}
             else
@@ -70,12 +70,12 @@ jobs:
       - name: Prepare artifacts
         id: prepare-artifacts
         run: |
-          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
-          for bin in $(echo "$BJSON" | jq -r '.[]'); do
+          PARSED='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$PARSED" | jq -r '.[]'); do
             mkdir -p artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}
             cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${bin} artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}/action-${bin} 2>/dev/null || true
           done
-          echo "binaries=$BJSON" >> "$GITHUB_OUTPUT"
+          echo "binaries=$PARSED" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
