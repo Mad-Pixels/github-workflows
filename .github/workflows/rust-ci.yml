@@ -17,9 +17,6 @@ on:
         type: string
         description: "Release version (only for release)"
         default: ""
-    secrets:
-      PAT:
-        required: false
 
 jobs:
   check:
@@ -72,5 +69,3 @@ jobs:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ needs.build.outputs.binaries }}
       version: ${{ github.ref_name }}
-    secrets:
-      PAT: ${{ secrets.PAT }}

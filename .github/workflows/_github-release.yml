@@ -15,9 +15,6 @@ on:
         required: true
         type: string
         description: "Directory containing Rust project"
-    secrets:
-      PAT:
-        required: true
 
 jobs:
   create-release:
@@ -52,6 +49,7 @@ jobs:
         id: create_release
         uses: actions/github-script@v6
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const version = '${{ inputs.version }}';
             const response = await github.rest.repos.createRelease({
@@ -69,7 +67,7 @@ jobs:
         run: |
           ARTIFACTS_DIR=artifacts
           UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
-          PAT=${{ secrets.PAT }}
+          TOKEN=${{ secrets.GITHUB_TOKEN }}
 
           for artifact in $(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r '.[].name'); do
             binary=$(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
@@ -79,12 +77,10 @@ jobs:
             if [ -f "$file_path" ]; then
               echo "Uploading $file_name..."
               curl -X POST "$UPLOAD_URL?name=$file_name" \
-                -H "Authorization: Bearer $PAT" \
+                -H "Authorization: Bearer $TOKEN" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary "@$file_path"
             else
               echo "Warning: File $file_path does not exist"
             fi
           done
-        env:
-          PAT: ${{ secrets.PAT }}
