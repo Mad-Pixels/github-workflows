@@ -42,33 +42,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Cache Cargo Registry and Git
+      - name: Cache Dependencies and Tools
         uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.rustup
+            ~/.cargo/bin/cross
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.target }}
           restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.target }}-
             ${{ runner.os }}-cargo-
+            ${{ runner.os }}-
+        continue-on-error: true
 
-      - name: Cache Rustup Toolchains and Targets (macOS only)
-        if: matrix.platform == 'darwin'
-        uses: actions/cache@v3
-        with:
-          path: ~/.rustup
-          key: ${{ runner.os }}-rustup-${{ matrix.target }}
-          restore-keys: |
-            ${{ runner.os }}-rustup-
-
-      - name: Cache Cross Installation (Linux only)
-        if: matrix.platform == 'linux'
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/bin/cross
-          key: ${{ runner.os }}-cross
-          restore-keys: |
-            ${{ runner.os }}-cross-
+      - name: Install Dependencies (${{ matrix.name }})
+        run: |
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            if ! command -v cross &> /dev/null; then
+              cargo install cross --git https://github.com/cross-rs/cross
+            fi
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
+            rustup target add ${{ matrix.target }}
+          fi
 
       - name: Parse Binary Names
         id: parse-binaries
@@ -77,19 +74,6 @@ jobs:
           script: |
             const binaries = JSON.parse('${{ inputs.binaries }}');
             core.setOutput('binaries', JSON.stringify(binaries));
-
-      - name: Install Dependencies (${{ matrix.name }})
-        if: matrix.platform == 'linux'
-        run: |
-          # Устанавливаем cross, если он не закэширован
-          if [ ! -f ~/.cargo/bin/cross ]; then
-            cargo install cross --git https://github.com/cross-rs/cross
-          fi
-
-      - name: Install Dependencies (${{ matrix.name }})
-        if: matrix.platform == 'darwin'
-        run: |
-          rustup target add ${{ matrix.target }}
 
       - name: Build Binaries (${{ matrix.name }})
         run: |

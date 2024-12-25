@@ -1,4 +1,5 @@
 name: Rust Check
+
 on:
   workflow_call:
     inputs:
@@ -6,7 +7,7 @@ on:
         required: true
         type: string
         description: "Directory containing Rust project (Cargo.toml)"
-  
+      
 jobs:
   check:
     name: Rust ${{ matrix.check.name }}
@@ -33,17 +34,18 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo registry
+      - name: Cache Cargo Registry and Git
         uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ${{ inputs.working-directory }}/target
-          key: ${{ runner.os }}-cargo-${{ matrix.check.cmd }}-${{ hashFiles('**/Cargo.lock') }}
+            ~/.rustup
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.check.cmd }}-
             ${{ runner.os }}-cargo-
+            ${{ runner.os }}-
+        continue-on-error: true 
 
       - name: Run ${{ matrix.check.name }}
         run: |
