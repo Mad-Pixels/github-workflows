@@ -26,7 +26,7 @@ jobs:
    
     steps:
       - uses: actions/checkout@v3
-     
+
       - name: Find crates
         id: find
         run: |
@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-
+       
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
@@ -84,15 +84,19 @@ jobs:
           key: build-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: build-
 
-      - name: Install Cross
-        if: matrix.platform.platform == 'linux' && matrix.platform.os == 'ubuntu-latest'
-        run: cargo install cross --git https://github.com/cross-rs/cross || true
+      - name: Set up Cross
+        if: matrix.platform.platform == 'linux'
+        uses: cross-rs/action@v1
+        with:
+          cross-version: "latest"
+          target: ${{ matrix.platform.target }}
+          shared-cache: true
 
       - name: Build
         working-directory: ${{ inputs.working-directory }}
         run: |
           echo "Building ${{ matrix.crate }} for ${{ matrix.platform.platform }}_${{ matrix.platform.arch }}"
-          if [ "${{ matrix.platform.platform }}" = "linux" ] && [ "${{ matrix.platform.os }}" = "ubuntu-latest" ]; then
+          if [ "${{ matrix.platform.platform }}" = "linux" ]; then
             cross build --release --target ${{ matrix.platform.target }} -p "${{ matrix.crate }}"
           else
             cargo build --release --target ${{ matrix.platform.target }} -p "${{ matrix.crate }}"
