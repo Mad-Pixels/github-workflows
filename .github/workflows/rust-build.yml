@@ -109,7 +109,7 @@ jobs:
           OUT_NAME="${{ matrix.crate }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}"
           cp "$BIN" "artifacts/${OUT_NAME}"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifacts }}
           path: artifacts/
