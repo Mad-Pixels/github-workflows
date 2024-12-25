@@ -11,10 +11,10 @@ on:
         required: true
         type: string
         description: "JSON array of binary names to build"
- 
+
 jobs:
   build:
-    name: Build ${{ matrix.platform }}/${{ matrix.arch }}
+    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -39,9 +39,38 @@ jobs:
       MATRIX_CONTEXT: Rust Build
       
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: Parse binary names
+      - name: Cache Cargo Registry and Git
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache Rustup Toolchains and Targets (macOS only)
+        if: matrix.platform == 'darwin'
+        uses: actions/cache@v3
+        with:
+          path: ~/.rustup
+          key: ${{ runner.os }}-rustup-${{ matrix.target }}
+          restore-keys: |
+            ${{ runner.os }}-rustup-
+
+      - name: Cache Cross Installation (Linux only)
+        if: matrix.platform == 'linux'
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/bin/cross
+          key: ${{ runner.os }}-cross
+          restore-keys: |
+            ${{ runner.os }}-cross-
+
+      - name: Parse Binary Names
         id: parse-binaries
         uses: actions/github-script@v6
         with:
@@ -49,21 +78,24 @@ jobs:
             const binaries = JSON.parse('${{ inputs.binaries }}');
             core.setOutput('binaries', JSON.stringify(binaries));
 
-      - name: Install dependencies (${{ matrix.name }})
+      - name: Install Dependencies (${{ matrix.name }})
         if: matrix.platform == 'linux'
         run: |
-          cargo install cross --git https://github.com/cross-rs/cross
+          # Устанавливаем cross, если он не закэширован
+          if [ ! -f ~/.cargo/bin/cross ]; then
+            cargo install cross --git https://github.com/cross-rs/cross
+          fi
 
-      - name: Install dependencies (${{ matrix.name }})
+      - name: Install Dependencies (${{ matrix.name }})
         if: matrix.platform == 'darwin'
         run: |
           rustup target add ${{ matrix.target }}
 
-      - name: Build binaries (${{ matrix.name }})
+      - name: Build Binaries (${{ matrix.name }})
         run: |
           cd ${{ inputs.working-directory }}
-          BINARIES='${{ steps.parse-binaries.outputs.binaries }}'
-          echo "$BINARIES" | jq -r '.[]' | while read binary; do
+          BINARIES=$(echo '${{ steps.parse-binaries.outputs.binaries }}' | jq -r '.[]')
+          for binary in $BINARIES; do
             if [ "${{ matrix.platform }}" = "linux" ]; then
               cross build --release --target ${{ matrix.target }} -p action-${binary}
             else
@@ -71,8 +103,21 @@ jobs:
             fi
           done
 
-      - name: Upload artifacts (${{ matrix.name }})
+      - name: Prepare Artifacts (${{ matrix.name }})
+        id: prepare-artifacts
+        run: |
+          BINARIES=$(echo '${{ steps.parse-binaries.outputs.binaries }}' | jq -r '.[]')
+          for binary in $BINARIES; do
+            mkdir -p artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}
+            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${binary} artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}/action-${binary}
+          done
+          echo "binaries=$(echo '${{ steps.parse-binaries.outputs.binaries }}')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Artifacts (${{ matrix.name }})
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ fromJSON(steps.parse-binaries.outputs.binaries)[matrix.binary] }}_${{ matrix.platform }}_${{ matrix.arch }}
-          path: ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${{ fromJSON(steps.parse-binaries.outputs.binaries)[matrix.binary] }}
+          name: binaries
+          path: artifacts/
+
+    outputs:
+      binaries: ${{ steps.prepare-artifacts.outputs.binaries }}

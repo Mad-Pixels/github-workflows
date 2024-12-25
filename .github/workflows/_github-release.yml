@@ -1,0 +1,90 @@
+name: GitHub Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+        description: "Release version (e.g. v1.0.0)"
+      binaries:
+        required: true
+        type: string
+        description: "JSON array of binary names"
+      working-directory:
+        required: true
+        type: string
+        description: "Directory containing Rust project"
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse binary names
+        id: parse-binaries
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const binaries = JSON.parse('${{ inputs.binaries }}');
+            const platforms = [
+              { platform: 'linux', arch: 'amd64' },
+              { platform: 'linux', arch: 'arm' },
+              { platform: 'darwin', arch: 'arm' }
+            ];
+            const artifacts = binaries.flatMap(binary => 
+              platforms.map(p => ({
+                name: `${binary}_${p.platform}_${p.arch}`,
+                binary
+              }))
+            );
+            core.setOutput('artifacts', JSON.stringify(artifacts));
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+          path: artifacts
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const version = '${{ inputs.version }}';
+            const response = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: version,
+              release_name: `Release ${version}`,
+              draft: false,
+              prerelease: false,
+            });
+            core.setOutput('release_id', response.data.id);
+            core.setOutput('upload_url', response.data.upload_url);
+
+      - name: Upload Release Assets
+        run: |
+          ARTIFACTS_DIR=artifacts
+          UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
+          GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+
+          for artifact in $(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r '.[].name'); do
+            binary=$(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
+            file_path="${ARTIFACTS_DIR}/${artifact}/action-${binary}"
+            file_name="action-${binary}-${artifact}"
+
+            if [ -f "$file_path" ]; then
+              echo "Uploading $file_name..."
+              curl -X POST "$UPLOAD_URL?name=$file_name" \
+                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@$file_path"
+            else
+              echo "Warning: File $file_path does not exist"
+            fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
