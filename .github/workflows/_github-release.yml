@@ -16,7 +16,7 @@ on:
         type: string
         description: "Directory containing Rust project"
     secrets:
-      GITHUB_TOKEN:
+      PAT:
         required: true
 
 jobs:
@@ -69,7 +69,7 @@ jobs:
         run: |
           ARTIFACTS_DIR=artifacts
           UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
-          GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          PAT=${{ secrets.PAT }}
 
           for artifact in $(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r '.[].name'); do
             binary=$(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
@@ -79,7 +79,7 @@ jobs:
             if [ -f "$file_path" ]; then
               echo "Uploading $file_name..."
               curl -X POST "$UPLOAD_URL?name=$file_name" \
-                -H "Authorization: Bearer $GITHUB_TOKEN" \
+                -H "Authorization: Bearer $PAT" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary "@$file_path"
             else
@@ -87,4 +87,4 @@ jobs:
             fi
           done
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAT: ${{ secrets.PAT }}

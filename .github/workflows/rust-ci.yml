@@ -28,7 +28,7 @@ on:
         description: "Release version (only for release)"
         default: ""
     secrets:
-      GITHUB_TOKEN:
+      PAT:
         required: false
 
 jobs:
@@ -83,4 +83,4 @@ jobs:
       binaries: ${{ needs.build.outputs.binaries }}
       version: ${{ github.ref_name }}
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PAT: ${{ secrets.PAT }}
