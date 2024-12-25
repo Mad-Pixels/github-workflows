@@ -24,7 +24,7 @@ jobs:
             target: x86_64-unknown-linux-musl
             platform: linux
             arch: amd64
-          - os: ubuntu-latest  
+          - os: ubuntu-latest
             target: aarch64-unknown-linux-musl
             platform: linux
             arch: arm
@@ -32,6 +32,7 @@ jobs:
             target: aarch64-apple-darwin
             platform: darwin
             arch: arm
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -43,6 +44,16 @@ jobs:
           script: |
             const bins = JSON.parse('${{ inputs.binaries }}');
             core.setOutput('binaries', JSON.stringify(bins));
+
+      - name: Install Dependencies
+        run: |
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            if ! command -v cross &> /dev/null; then
+              cargo install cross --git https://github.com/cross-rs/cross
+            fi
+          else
+            rustup target add ${{ matrix.target }}
+          fi
 
       - name: Build Binaries
         run: |
@@ -60,10 +71,9 @@ jobs:
         id: prepare-artifacts
         run: |
           BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
-          BINARIES=$(echo "$BINARIES_JSON" | jq -r '.[]')
-          for binary in $BINARIES; do
+          for binary in $(echo "$BINARIES_JSON" | jq -r '.[]'); do
             mkdir -p artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}
-            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${binary} artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}/action-${binary}
+            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${binary} artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}/action-${binary} 2>/dev/null || true
           done
           echo "binaries=$BINARIES_JSON" >> "$GITHUB_OUTPUT"
 
