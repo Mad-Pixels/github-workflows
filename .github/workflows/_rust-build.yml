@@ -6,11 +6,9 @@ on:
       working-directory:
         required: true
         type: string
-        description: "Directory containing Rust project"
       binaries:
         required: true
         type: string
-        description: "JSON array of binary names to build"
 
 jobs:
   build:
@@ -47,7 +45,7 @@ jobs:
             const bins = JSON.parse(raw);
             core.setOutput('binaries', JSON.stringify(bins));
 
-      - name: Install rust/cross
+      - name: Install tools
         run: |
           if [ "${{ matrix.platform }}" = "linux" ]; then
             if ! command -v cross &> /dev/null; then
@@ -60,25 +58,24 @@ jobs:
       - name: Build
         run: |
           cd ${{ inputs.working-directory }}
-          BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
-          BINARIES=$(echo "$BINARIES_JSON" | jq -r '.[]')
-          for binary in $BINARIES; do
+          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$BJSON" | jq -r '.[]'); do
             if [ "${{ matrix.platform }}" = "linux" ]; then
-              cross build --release --target ${{ matrix.target }} -p action-${binary}
+              cross build --release --target ${{ matrix.target }} -p action-${bin}
             else
-              cargo build --release --target ${{ matrix.target }} -p action-${binary}
+              cargo build --release --target ${{ matrix.target }} -p action-${bin}
             fi
           done
 
       - name: Prepare artifacts
         id: prepare-artifacts
         run: |
-          BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
-          for binary in $(echo "$BINARIES_JSON" | jq -r '.[]'); do
-            mkdir -p artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}
-            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${binary} artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}/action-${binary} 2>/dev/null || true
+          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$BJSON" | jq -r '.[]'); do
+            mkdir -p artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}
+            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${bin} artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}/action-${bin} 2>/dev/null || true
           done
-          echo "binaries=$BINARIES_JSON" >> "$GITHUB_OUTPUT"
+          echo "binaries=$BJSON" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3

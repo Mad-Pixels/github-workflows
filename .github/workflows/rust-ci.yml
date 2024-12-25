@@ -57,7 +57,7 @@ jobs:
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
-      binaries: ${{ needs.discover.outputs.binaries }}
+      binaries:  '["terraform"]' #${{ needs.discover.outputs.binaries }}
 
   release:
     if: >
