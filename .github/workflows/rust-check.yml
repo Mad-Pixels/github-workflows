@@ -7,11 +7,13 @@ on:
         required: true
         type: string
         description: "Directory containing Rust project (Cargo.toml)"
-      
+
 jobs:
   check:
     name: Rust ${{ matrix.check.name }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     strategy:
       matrix:
         check:
@@ -22,12 +24,14 @@ jobs:
           - name: Clippy
             cmd: clippy
       fail-fast: false
+
     env:
       MATRIX_CONTEXT: Rust Checks
       JOB_NAME: ${{ matrix.check.name }}
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -45,7 +49,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
             ${{ runner.os }}-
-        continue-on-error: true 
 
       - name: Run ${{ matrix.check.name }}
         run: |
@@ -61,3 +64,7 @@ jobs:
               cargo clippy -- -D warnings
               ;;
           esac
+
+      - name: Clean cache on failure
+        if: failure()
+        run: rm -rf ~/.cargo/registry ~/.cargo/git
