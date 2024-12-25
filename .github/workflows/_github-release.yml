@@ -68,12 +68,10 @@ jobs:
           ARTIFACTS_DIR=artifacts
           UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
           TOKEN=${{ secrets.GITHUB_TOKEN }}
-
           for artifact in $(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r '.[].name'); do
             binary=$(echo '${{ steps.parse-binaries.outputs.artifacts }}' | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
             file_path="${ARTIFACTS_DIR}/${artifact}/action-${binary}"
             file_name="action-${binary}-${artifact}"
-
             if [ -f "$file_path" ]; then
               echo "Uploading $file_name..."
               curl -X POST "$UPLOAD_URL?name=$file_name" \

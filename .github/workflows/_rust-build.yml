@@ -32,45 +32,17 @@ jobs:
             target: aarch64-apple-darwin
             platform: darwin
             arch: arm
-    env:
-      MATRIX_CONTEXT: Rust Build
-      
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
-
-      - name: Cache Dependencies and Tools
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ~/.rustup
-            ~/.cargo/bin/cross
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.target }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.target }}-
-            ${{ runner.os }}-cargo-
-            ${{ runner.os }}-
-        continue-on-error: true
-
-      - name: Install Dependencies
-        run: |
-          if [ "${{ matrix.platform }}" = "linux" ]; then
-            if ! command -v cross &> /dev/null; then
-              cargo install cross --git https://github.com/cross-rs/cross
-            fi
-          elif [ "${{ matrix.platform }}" = "darwin" ]; then
-            rustup target add ${{ matrix.target }}
-          fi
 
       - name: Parse Binary Names
         id: parse-binaries
         uses: actions/github-script@v6
         with:
           script: |
-            const binaries = JSON.parse('${{ inputs.binaries }}');
-            core.setOutput('binaries', JSON.stringify(binaries));
+            const bins = JSON.parse('${{ inputs.binaries }}');
+            core.setOutput('binaries', JSON.stringify(bins));
 
       - name: Build Binaries
         run: |
@@ -87,14 +59,15 @@ jobs:
       - name: Prepare Artifacts
         id: prepare-artifacts
         run: |
-          BINARIES=$(echo '${{ steps.parse-binaries.outputs.binaries }}' | jq -r '.[]')
+          BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
+          BINARIES=$(echo "$BINARIES_JSON" | jq -r '.[]')
           for binary in $BINARIES; do
             mkdir -p artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}
             cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${binary} artifacts/${binary}_${{ matrix.platform }}_${{ matrix.arch }}/action-${binary}
           done
-          echo "binaries=$(echo '${{ steps.parse-binaries.outputs.binaries }}')" >> "$GITHUB_OUTPUT"
+          echo "binaries=$BINARIES_JSON" >> "$GITHUB_OUTPUT"
 
-      - name: Upload Artifacts (${{ matrix.name }})
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: binaries
