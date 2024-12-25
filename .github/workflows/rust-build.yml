@@ -81,7 +81,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ~/.rustup
-          key: build-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          key: build-${{ matrix.platform.os }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: build-
 
       - name: Install Cross
