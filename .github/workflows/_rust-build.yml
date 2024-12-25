@@ -14,10 +14,8 @@ on:
 
 jobs:
   build:
-    name: Build
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -34,18 +32,22 @@ jobs:
             arch: arm
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Parse Binary Names
+      - name: Parse binary names
         id: parse-binaries
         uses: actions/github-script@v6
         with:
           script: |
-            const bins = JSON.parse('${{ inputs.binaries }}');
+            const raw = '${{ inputs.binaries }}';
+            if (!raw) {
+              throw new Error('No binaries JSON provided');
+            }
+            const bins = JSON.parse(raw);
             core.setOutput('binaries', JSON.stringify(bins));
 
-      - name: Install Dependencies
+      - name: Install rust/cross
         run: |
           if [ "${{ matrix.platform }}" = "linux" ]; then
             if ! command -v cross &> /dev/null; then
@@ -55,10 +57,11 @@ jobs:
             rustup target add ${{ matrix.target }}
           fi
 
-      - name: Build Binaries
+      - name: Build
         run: |
           cd ${{ inputs.working-directory }}
-          BINARIES=$(echo '${{ steps.parse-binaries.outputs.binaries }}' | jq -r '.[]')
+          BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
+          BINARIES=$(echo "$BINARIES_JSON" | jq -r '.[]')
           for binary in $BINARIES; do
             if [ "${{ matrix.platform }}" = "linux" ]; then
               cross build --release --target ${{ matrix.target }} -p action-${binary}
@@ -67,7 +70,7 @@ jobs:
             fi
           done
 
-      - name: Prepare Artifacts
+      - name: Prepare artifacts
         id: prepare-artifacts
         run: |
           BINARIES_JSON='${{ steps.parse-binaries.outputs.binaries }}'
@@ -77,7 +80,7 @@ jobs:
           done
           echo "binaries=$BINARIES_JSON" >> "$GITHUB_OUTPUT"
 
-      - name: Upload Artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: binaries
