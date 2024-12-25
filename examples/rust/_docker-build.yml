@@ -1,0 +1,62 @@
+jobs:
+  docker:
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      dockerfile: "images/app/Dockerfile"
+      image_name: "myapp"
+      tag: "v1.0.0"
+      build_args: '{"VERSION": "1.2.3"}'
+      platforms: "linux/amd64,linux/arm64"
+
+jobs:
+  docker:
+    uses: ./.github/workflows/dockerhub-push.yml
+    with:
+      dockerfile: "images/app/Dockerfile"
+      repository: "myapp"
+      tag: "v1.0.0"
+      build_args: '{"VERSION": "1.2.3"}'
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
+  push-ecr:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          path: ./images
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Docker Login to ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | docker login \
+            --username AWS \
+            --password-stdin <account-id>.dkr.ecr.us-east-1.amazonaws.com
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+
+      - name: Load and push to ECR
+        run: |
+          # Аналогично распакуем все tar
+          for TARBALL in ./images/*.tar; do
+            docker load -i "$TARBALL"
+          done
+
+          # Например, создадим теги под ECR
+          ECR_REPO="<account-id>.dkr.ecr.us-east-1.amazonaws.com/${{ github.event.inputs.repository }}"
+          docker buildx imagetools create --tag "${ECR_REPO}:${{ github.event.inputs.tag }}" \
+            "${ECR_REPO}:${{ github.event.inputs.tag }}-linux/amd64" \
+            "${ECR_REPO}:${{ github.event.inputs.tag }}-linux/arm64"

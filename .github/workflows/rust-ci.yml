@@ -30,8 +30,7 @@ on:
 jobs:
   check:
     if: >
-      (github.event_name == 'push' && github.ref != 'refs/heads/main')
-      || (github.event_name == 'pull_request')
+      (github.event_name == 'push' && github.ref != 'refs/heads/main') || (github.event_name == 'pull_request')
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-check.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}

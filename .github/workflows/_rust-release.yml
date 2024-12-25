@@ -42,7 +42,6 @@ jobs:
             
             core.setOutput('artifacts', JSON.stringify(artifacts));
 
-      # Скачиваем все артефакты
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
