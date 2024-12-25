@@ -2,7 +2,7 @@ name: Rust Build
 
 on:
   workflow_call:
-    inputs:
+   inputs:
       working-directory:
         required: false
         default: ""
@@ -20,13 +20,13 @@ on:
 
 jobs:
   discover:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       crates: ${{ steps.find.outputs.list }}
-   
+  
     steps:
       - uses: actions/checkout@v3
-     
+    
       - name: Find crates
         id: find
         run: |
@@ -53,11 +53,11 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-musl
             platform: linux
             arch: amd64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: aarch64-unknown-linux-musl
             platform: linux
             arch: arm
@@ -84,13 +84,9 @@ jobs:
           key: build-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: build-
 
-      - name: Set up Cross
+      - name: Install Cross
         if: matrix.platform.platform == 'linux'
-        uses: cross-rs/action@v1
-        with:
-          cross-version: "latest"
-          target: ${{ matrix.platform.target }}
-          shared-cache: true
+        run: cargo install cross --git https://github.com/cross-rs/cross || true
 
       - name: Build
         working-directory: ${{ inputs.working-directory }}
