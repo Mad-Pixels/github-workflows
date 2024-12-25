@@ -86,7 +86,9 @@ jobs:
 
       - name: Install Cross
         if: matrix.platform.platform == 'linux'
-        run: cargo install cross --git https://github.com/cross-rs/cross || true
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
       - name: Build
         working-directory: ${{ inputs.working-directory }}
