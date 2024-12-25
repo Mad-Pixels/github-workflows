@@ -1,6 +1,16 @@
 name: Rust CI
 
 on:
+  push:
+    branches: [ "**" ]
+    tags:
+      - 'v*.*.*'
+    paths:
+      - "**.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+  pull_request:
+    branches: [ "**" ]
   workflow_call:
     inputs:
       working-directory:
@@ -23,11 +33,21 @@ on:
 
 jobs:
   check:
+    if: >
+      (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) || 
+      (github.event_name == 'pull_request')
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-check.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
 
   discover:
+    if: >
+      (github.event_name == 'pull_request' 
+       && github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'push' 
+       && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' 
+       && startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     outputs:
       binaries: ${{ steps.discover-binaries.outputs.binaries }}
@@ -39,6 +59,13 @@ jobs:
           echo "binaries=$BINARIES" >> "$GITHUB_OUTPUT"
 
   build:
+    if: >
+      (github.event_name == 'pull_request' 
+       && github.event.pull_request.base.ref == 'main') ||
+      (github.event_name == 'push' 
+       && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'push' 
+       && startsWith(github.ref, 'refs/tags/'))
     needs: [check, discover]
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
     with:
@@ -46,11 +73,14 @@ jobs:
       binaries: ${{ needs.discover.outputs.binaries }}
 
   release:
+    if: >
+      (github.event_name == 'push')
+      && (startsWith(github.ref, 'refs/tags/'))
     needs: build
     uses: Mad-Pixels/github-workflows/.github/workflows/_github-release.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
       binaries: ${{ needs.build.outputs.binaries }}
-      version: ${{ inputs.version }}
+      version: ${{ github.ref_name }}
     secrets:
       PAT: ${{ secrets.PAT }}
