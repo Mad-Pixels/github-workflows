@@ -67,15 +67,14 @@ jobs:
       - name: Upload release assets
         run: |
           AJSON='${{ steps.parse-binaries.outputs.artifacts }}'
-          URL=${{ steps.create_release.outputs.upload_url }}
+          UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
           TOKEN=${{ secrets.GITHUB_TOKEN }}
           for artifact in $(echo "$AJSON" | jq -r '.[].name'); do
             bin=$(echo "$AJSON" | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
             file_path="artifacts/${artifact}/action-${bin}"
             file_name="action-${bin}-${artifact}"
             if [ -f "$file_path" ]; then
-              echo "Uploading $file_name"
-              curl -X POST "$URL?name=$file_name" \
+              curl -X POST "$UPLOAD_URL?name=$file_name" \
                 -H "Authorization: Bearer $TOKEN" \
                 -H "Content-Type: application/octet-stream" \
                 --data-binary "@$file_path"

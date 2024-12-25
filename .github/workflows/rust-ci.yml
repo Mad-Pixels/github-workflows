@@ -1,4 +1,4 @@
-name: Rust CI
+name: Rust Build
 
 on:
   workflow_call:
@@ -6,66 +6,82 @@ on:
       working-directory:
         required: true
         type: string
-        description: "Directory containing Rust project"
-      binaries-directory:
-        required: false
+      binaries:
+        required: true
         type: string
-        description: "Directory containing sources for build"
-        default: "bin"
-      version:
-        required: false
-        type: string
-        description: "Release version (only for release)"
-        default: ""
 
 jobs:
-  check:
-    if: >
-      (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) || 
-      (github.event_name == 'pull_request')
-    uses: Mad-Pixels/github-workflows/.github/workflows/_rust-check.yml@dev
-    with:
-      working-directory: ${{ inputs.working-directory }}
-
-  discover:
-    if: >
-      (github.event_name == 'pull_request' 
-       && github.event.pull_request.base.ref == 'main') ||
-      (github.event_name == 'push' 
-       && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' 
-       && startsWith(github.ref, 'refs/tags/'))
-    runs-on: ubuntu-latest
-    outputs:
-      binaries: ${{ steps.discover-binaries.outputs.binaries }}
-    steps:
-      - uses: actions/checkout@v3
-      - id: discover-binaries
-        run: |
-          BINARIES=$(ls ${{ inputs.working-directory }}/${{ inputs.binaries-directory }} | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "binaries=$BINARIES" >> "$GITHUB_OUTPUT"
-
   build:
-    if: >
-      (github.event_name == 'pull_request' 
-       && github.event.pull_request.base.ref == 'main') ||
-      (github.event_name == 'push' 
-       && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'push' 
-       && startsWith(github.ref, 'refs/tags/'))
-    needs: [discover]
-    uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
-    with:
-      working-directory: ${{ inputs.working-directory }}
-      binaries:  '["terraform"]' #${{ needs.discover.outputs.binaries }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            platform: linux
+            arch: amd64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            platform: linux
+            arch: arm
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: darwin
+            arch: arm
 
-  release:
-    if: >
-      (github.event_name == 'push')
-      && (startsWith(github.ref, 'refs/tags/'))
-    needs: build
-    uses: Mad-Pixels/github-workflows/.github/workflows/_github-release.yml@dev
-    with:
-      working-directory: ${{ inputs.working-directory }}
-      binaries: ${{ needs.build.outputs.binaries }}
-      version: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Parse binaries
+        id: parse-binaries
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const raw = '${{ inputs.binaries }}';
+            if (!raw) {
+              throw new Error('No binaries JSON provided');
+            }
+            const bins = JSON.parse(raw);
+            core.setOutput('binaries', JSON.stringify(bins));
+
+      - name: Install
+        run: |
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            if ! command -v cross &> /dev/null; then
+              cargo install cross --git https://github.com/cross-rs/cross
+            fi
+          else
+            rustup target add ${{ matrix.target }}
+
+      - name: Build
+        id: do-build
+        run: |
+          cd ${{ inputs.working-directory }}
+          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$BJSON" | jq -r '.[]'); do
+            if [ "${{ matrix.platform }}" = "linux" ]; then
+              cross build --release --target ${{ matrix.target }} -p action-${bin}
+            else
+              cargo build --release --target ${{ matrix.target }} -p action-${bin}
+            fi
+          done
+
+      - name: Prepare artifacts
+        id: prepare-artifacts
+        run: |
+          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
+          for bin in $(echo "$BJSON" | jq -r '.[]'); do
+            mkdir -p artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}
+            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${bin} artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}/action-${bin} 2>/dev/null || true
+          done
+          echo "binaries=$BJSON" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: artifacts/
+
+    outputs:
+      binaries: ${{ steps.prepare-artifacts.outputs.binaries }}
