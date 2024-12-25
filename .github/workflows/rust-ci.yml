@@ -53,7 +53,7 @@ jobs:
        && github.ref == 'refs/heads/main') ||
       (github.event_name == 'push' 
        && startsWith(github.ref, 'refs/tags/'))
-    needs: [check, discover]
+    needs: [discover]
     uses: Mad-Pixels/github-workflows/.github/workflows/_rust-build.yml@dev
     with:
       working-directory: ${{ inputs.working-directory }}
