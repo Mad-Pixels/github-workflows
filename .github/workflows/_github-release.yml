@@ -74,6 +74,7 @@ jobs:
             file_path="artifacts/${artifact}/action-${bin}"
             file_name="action-${bin}-${artifact}"
             if [ -f "$file_path" ]; then
+              echo "Uploading $file_name"
               curl -X POST "$URL?name=$file_name" \
                 -H "Authorization: Bearer $TOKEN" \
                 -H "Content-Type: application/octet-stream" \

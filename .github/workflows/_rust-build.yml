@@ -45,7 +45,7 @@ jobs:
             const bins = JSON.parse(raw);
             core.setOutput('binaries', JSON.stringify(bins));
 
-      - name: Install tools
+      - name: Install
         run: |
           if [ "${{ matrix.platform }}" = "linux" ]; then
             if ! command -v cross &> /dev/null; then
