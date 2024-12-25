@@ -23,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       crates: ${{ steps.find.outputs.list }}
-   
+  
     steps:
       - uses: actions/checkout@v3
-
+    
       - name: Find crates
         id: find
         run: |
@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-       
+
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
@@ -84,13 +84,9 @@ jobs:
           key: build-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
           restore-keys: build-
 
-      - name: Set up Cross
+      - name: Install Cross
         if: matrix.platform.platform == 'linux'
-        uses: cross-rs/action@v1
-        with:
-          cross-version: "latest"
-          target: ${{ matrix.platform.target }}
-          shared-cache: true
+        run: cargo install cross --git https://github.com/cross-rs/cross || true
 
       - name: Build
         working-directory: ${{ inputs.working-directory }}
