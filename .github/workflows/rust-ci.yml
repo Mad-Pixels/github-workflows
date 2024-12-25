@@ -1,87 +1,79 @@
-name: Rust Build
+# .github/workflows/rust-ci.yml
+name: Rust CI
 
 on:
-  workflow_call:
-    inputs:
-      working-directory:
-        required: true
-        type: string
-      binaries:
-        required: true
-        type: string
+  push:
+    branches: [ "**" ]
+    tags:
+      - 'v*.*.*'
+    paths:
+      - "**.rs"
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+  pull_request:
+    branches: [ "**" ]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-musl
-            platform: linux
-            arch: amd64
-          - os: ubuntu-latest
-            target: aarch64-unknown-linux-musl
-            platform: linux
-            arch: arm
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            platform: darwin
-            arch: arm
-
+  check-discover:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Parse binaries
-        id: parse-binaries
-        uses: actions/github-script@v6
+      - name: Rust Check
+        if: >
+          (github.event_name == 'push' && github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')) ||
+          (github.event_name == 'pull_request')
+        uses: your-org/your-repo/.github/workflows/_rust-check.yml@main
         with:
-          script: |
-            const raw = '${{ inputs.binaries }}';
-            if (!raw) {
-              throw new Error('No binaries JSON provided');
-            }
-            const bins = JSON.parse(raw);
-            core.setOutput('binaries', JSON.stringify(bins));
+          working-directory: ${{ inputs.working-directory }}
 
-      - name: Install
+      - name: Discover Binaries
+        if: >
+          (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') ||
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/'))
+        id: discover-binaries
         run: |
-          if [ "${{ matrix.platform }}" = "linux" ]; then
-            if ! command -v cross &> /dev/null; then
-              cargo install cross --git https://github.com/cross-rs/cross
-            fi
+          BIN_DIR="${{ github.workspace }}/${{ inputs.working-directory }}/${{ inputs.binaries-directory }}"
+          if [ -d "$BIN_DIR" ]; then
+            BINARIES=$(ls "$BIN_DIR" | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
-            rustup target add ${{ matrix.target }}
-
-      - name: Build
-        id: do-build
-        run: |
-          cd ${{ inputs.working-directory }}
-          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
-          for bin in $(echo "$BJSON" | jq -r '.[]'); do
-            if [ "${{ matrix.platform }}" = "linux" ]; then
-              cross build --release --target ${{ matrix.target }} -p action-${bin}
-            else
-              cargo build --release --target ${{ matrix.target }} -p action-${bin}
-            fi
-          done
-
-      - name: Prepare artifacts
-        id: prepare-artifacts
-        run: |
-          BJSON='${{ steps.parse-binaries.outputs.binaries }}'
-          for bin in $(echo "$BJSON" | jq -r '.[]'); do
-            mkdir -p artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}
-            cp ${{ inputs.working-directory }}/target/${{ matrix.target }}/release/action-${bin} artifacts/${bin}_${{ matrix.platform }}_${{ matrix.arch }}/action-${bin} 2>/dev/null || true
-          done
-          echo "binaries=$BJSON" >> "$GITHUB_OUTPUT"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: binaries
-          path: artifacts/
+            BINARIES='[]'
+          fi
+          echo "binaries=$BINARIES" >> $GITHUB_OUTPUT
 
     outputs:
-      binaries: ${{ steps.prepare-artifacts.outputs.binaries }}
+      discovered_binaries: ${{ steps.discover-binaries.outputs.binaries }}
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [check-discover]
+    steps:
+      - name: Call Rust Build
+        id: build-step
+        uses: your-org/your-repo/.github/workflows/_rust-build.yml@main
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          binaries: ${{ needs.check-discover.outputs.discovered_binaries }}
+
+      - name: Set Build Outputs
+        id: collect-outputs
+        run: echo "build_binaries=${{ steps.build-step.outputs.binaries }}" >> $GITHUB_OUTPUT
+
+    outputs:
+      build_binaries: ${{ steps.collect-outputs.outputs.build_binaries }}
+
+  release:
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'push') &&
+      (startsWith(github.ref, 'refs/tags/'))
+    needs: build
+    steps:
+      - name: Call GitHub Release
+        uses: your-org/your-repo/.github/workflows/_github-release.yml@main
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          binaries: ${{ needs.build.outputs.build_binaries }}
+          version: ${{ github.ref_name }}

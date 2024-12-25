@@ -1,78 +1,32 @@
-name: Docker Build
+# .github/workflows/rust-build.yml
+name: Rust Build
 
 on:
   workflow_call:
     inputs:
-      dockerfile:
+      working-directory:
         required: true
         type: string
-        description: "Path to Dockerfile"
-      image_name:
-        required: true
-        type: string
-        description: "Local image name (without tag)"
-      tag:
-        required: true
-        type: string
-        description: "Image tag"
-      build_args:
-        required: false
-        type: string
-        description: "JSON object of build args. Example: {\"ARG1\":\"value1\"}"
-        default: "{}"
-      platforms:
-        required: false
-        type: string
-        description: "Comma-separated list of platforms. Example: linux/amd64,linux/arm64"
-        default: "linux/amd64,linux/arm64"
 
 jobs:
-  discover:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - id: set-matrix
-        run: |
-          # from "linux/amd64,linux/arm64" to {"platform":["linux/amd64","linux/arm64"]}
-          MATRIX=$(echo '${{ inputs.platforms }}' | jq -R 'split(",") | {platform: .}')
-          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
-
   build:
-    needs: discover
     runs-on: ubuntu-latest
-    strategy:
-      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
-      fail-fast: false
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v3
 
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-
-      - name: Build Docker image (no push)
-        id: docker_build
+      - name: Install Rust
         run: |
-          docker buildx build \
-            --platform ${{ matrix.platform }} \
-            --file ${{ inputs.dockerfile }} \
-            --build-arg BUILD_ARGS='${{ inputs.build_args }}' \
-            --build-arg SOME_ARG=123 \
-            -t ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }} \
-            --load \
-            .
+          rustup override set stable
+          rustup update stable
 
-      - name: Save Docker image as artifact
+      - name: Build
         run: |
-          IMAGE_TAR="${{ inputs.image_name }}_${{ inputs.tag }}_${{ matrix.platform }}.tar"
-          docker save -o $IMAGE_TAR ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }}
-          echo "IMAGE_TAR=$IMAGE_TAR" >> $GITHUB_ENV
+          cd ${{ inputs.working-directory }}
+          cargo build --release
 
-      - uses: actions/upload-artifact@v3
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: ${{ inputs.image_name }}-${{ matrix.platform }}
-          path: ${{ env.IMAGE_TAR }}
+          name: build-output
+          path: ${{ inputs.working-directory }}/target

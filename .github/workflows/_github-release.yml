@@ -1,12 +1,10 @@
+# .github/workflows/github-release.yml
 name: GitHub Release
 
 on:
   workflow_call:
     inputs:
       version:
-        required: true
-        type: string
-      binaries:
         required: true
         type: string
       working-directory:
@@ -17,34 +15,11 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
-      - name: Parse binary names
-        id: parse-binaries
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const raw = '${{ inputs.binaries }}';
-            if (!raw) {
-              throw new Error('No binaries JSON provided');
-            }
-            const bins = JSON.parse(raw);
-            const platforms = [
-              { platform: 'linux', arch: 'amd64' },
-              { platform: 'linux', arch: 'arm' },
-              { platform: 'darwin', arch: 'arm' }
-            ];
-            const artifacts = bins.flatMap(binary =>
-              platforms.map(p => ({
-                name: `${binary}_${p.platform}_${p.arch}`,
-                binary
-              }))
-            );
-            core.setOutput('artifacts', JSON.stringify(artifacts));
-
-      - name: Download artifacts
+      - name: Download build artifact
         uses: actions/download-artifact@v3
         with:
-          name: binaries
-          path: artifacts
+          name: build-output
+          path: build-artifacts
 
       - name: Create release
         id: create_release
@@ -64,21 +39,15 @@ jobs:
             core.setOutput('release_id', resp.data.id);
             core.setOutput('upload_url', resp.data.upload_url);
 
-      - name: Upload release assets
+      - name: Upload release files
         run: |
-          AJSON='${{ steps.parse-binaries.outputs.artifacts }}'
           UPLOAD_URL=${{ steps.create_release.outputs.upload_url }}
           TOKEN=${{ secrets.GITHUB_TOKEN }}
-          for artifact in $(echo "$AJSON" | jq -r '.[].name'); do
-            bin=$(echo "$AJSON" | jq -r --arg name "$artifact" '.[] | select(.name==$name) | .binary')
-            file_path="artifacts/${artifact}/action-${bin}"
-            file_name="action-${bin}-${artifact}"
-            if [ -f "$file_path" ]; then
-              curl -X POST "$UPLOAD_URL?name=$file_name" \
-                -H "Authorization: Bearer $TOKEN" \
-                -H "Content-Type: application/octet-stream" \
-                --data-binary "@$file_path"
-            else
-              echo "Missing file: $file_path"
-            fi
+          find build-artifacts -type f | while read file; do
+            fname=$(basename "$file")
+            echo "Uploading $fname"
+            curl -X POST "$UPLOAD_URL?name=$fname" \
+              -H "Authorization: Bearer $TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$file"
           done
