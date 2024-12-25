@@ -34,8 +34,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          # Превращаем строку "linux/amd64,linux/arm64" в JSON-массив, подходящий для матрицы.
-          # Пример результата: {"platform":["linux/amd64","linux/arm64"]}
+          # from "linux/amd64,linux/arm64" to {"platform":["linux/amd64","linux/arm64"]}
           MATRIX=$(echo '${{ inputs.platforms }}' | jq -R 'split(",") | {platform: .}')
           echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
 
