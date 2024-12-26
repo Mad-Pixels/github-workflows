@@ -87,8 +87,9 @@ jobs:
 
       - name: Save Docker image as artifact
         run: |
-          IMAGE_TAR="${{ inputs.image_name }}_${{ inputs.tag }}_${{ matrix.platform }}.tar"
-          docker save -o $IMAGE_TAR ${{ inputs.image_name }}:${{ inputs.tag }}
+          PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
+          IMAGE_TAR="${{ inputs.image_name }}_${{ inputs.tag }}_${PLATFORM_NAME}.tar"
+          docker save -o "$IMAGE_TAR" ${{ inputs.image_name }}:${{ inputs.tag }}
           echo "IMAGE_TAR=$IMAGE_TAR" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v3
