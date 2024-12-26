@@ -79,8 +79,8 @@ jobs:
           
           docker buildx build \
             --platform ${{ matrix.platform }} \
-            --file ${{ inputs.context }}/Dockerfile.terraform \ 
-            $BUILD_ARGS \
+            --file ${{ inputs.context }}/Dockerfile.terraform \
+            ${BUILD_ARGS} \
             -t ${{ inputs.image_name }}:${{ inputs.tag }} \
             --load \
             ${{ inputs.context }}
