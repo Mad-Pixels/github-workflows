@@ -8,10 +8,6 @@ on:
         default: ""
         type: string
         description: "Directory containing Rust project (Cargo.toml)"
-      artifacts:
-        required: true
-        type: string
-        description: "Name for artifacts archive"
       crates-path:
         required: false
         default: ""
