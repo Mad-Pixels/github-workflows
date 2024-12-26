@@ -87,18 +87,13 @@ jobs:
            BUILD_ARGS="$BUILD_ARGS $arg"
          done
 
-         # Platform specific tag
-         PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
-         PLATFORM_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}"
-
-         # Build and push platform specific image
          docker buildx build \
-           --platform ${{ matrix.platform }} \
-           --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
-           ${BUILD_ARGS} \
-           -t ${PLATFORM_TAG} \
-           --push \
-           ${{ inputs.context }}
+            --platform ${{ matrix.platform }} \
+            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
+            ${BUILD_ARGS} \
+            -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}" \
+            --push \
+            ${{ inputs.context }}
 
      # Wait for all platform builds to complete before creating manifest
      - name: Create Multi-Platform Manifest
