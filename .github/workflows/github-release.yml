@@ -3,62 +3,70 @@ name: GitHub Release
 on:
   workflow_call:
     inputs:
-      release:
+      tag:
         required: true
         type: string
-        description: "Release version"
 
 jobs:
   create-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    
     steps:
-      - name: Download artifacts
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: tag
+        run: echo "TAG=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: binaries
           path: artifacts
 
-      - name: Create release
-        id: create_release
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const version = '${{ inputs.version }}';
-            const resp = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: version,
-              release_name: `Release ${version}`,
-              draft: false,
-              prerelease: false
-            });
-            core.setOutput('release_id', resp.data.id);
-            core.setOutput('upload_url', resp.data.upload_url);
-
-      - name: Upload release files
+      - name: Check for artifacts
         run: |
-          ARTIFACTS='${{ inputs.binaries }}'
-          if [ -z "$ARTIFACTS" ]; then
-            echo "No binaries JSON provided"
+          if [ ! -d "artifacts" ] || [ -z "$(ls -A artifacts)" ]; then
+            echo "No artifacts found to upload!"
             exit 1
           fi
 
-          URL=${{ steps.create_release.outputs.upload_url }}
-          TOKEN=${{ secrets.GITHUB_TOKEN }}
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          if ! LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            echo "No previous tags found, using first commit"
+            LAST_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
 
-          for bin in $(echo "$ARTIFACTS" | jq -r '.[]'); do
-            for plat_arch in linux_amd64 linux_arm darwin_arm; do
-              FILE_PATH="artifacts/${bin}_${plat_arch}/action-${bin}"
-              FILE_NAME="action-${bin}-${plat_arch}"
-              if [ -f "$FILE_PATH" ]; then
-                echo "Uploading $FILE_NAME"
-                curl -X POST "$URL?name=$FILE_NAME" \
-                  -H "Authorization: Bearer $TOKEN" \
-                  -H "Content-Type: application/octet-stream" \
-                  --data-binary "@$FILE_PATH"
-              else
-                echo "Missing $FILE_PATH"
-              fi
-            done
-          done
+          echo "Found last tag: $LAST_TAG"
+          echo "Current tag: ${{ steps.tag.outputs.TAG }}"
+
+          if ! git log "$LAST_TAG..HEAD" --pretty=format:"- %s [%h] (by %an)" > release-notes.txt; then
+            echo "Failed to generate release notes"
+            exit 1
+          fi
+
+          NOTES="$(cat release-notes.txt)"
+          echo "NOTES<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.tag.outputs.TAG }} \
+            --title "Release ${{ steps.tag.outputs.TAG }}" \
+            --notes "${{ steps.notes.outputs.NOTES }}"
+
+      - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ steps.tag.outputs.TAG }} artifacts/* --clobber
