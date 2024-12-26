@@ -25,6 +25,11 @@ on:
         type: string
         description: "Comma-separated list of platforms. Example: linux/amd64,linux/arm64"
         default: "linux/amd64,linux/arm64"
+      context:
+        required: false
+        type: string
+        default: "."
+        description: "Docker build context path"
 
 jobs:
   discover:
@@ -62,7 +67,7 @@ jobs:
             --build-arg SOME_ARG=123 \
             -t ${{ inputs.image_name }}:${{ inputs.tag }} \
             --load \
-            .
+            ${{ inputs.context }}
 
       - name: Save Docker image as artifact
         run: |

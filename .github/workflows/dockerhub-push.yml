@@ -25,6 +25,11 @@ on:
         type: string
         description: "Comma-separated list of platforms"
         default: "linux/amd64,linux/arm64"
+      context:
+        required: false
+        type: string
+        default: "."
+        description: "Docker build context path"
     secrets:
       dockerhub-username:
         required: true
@@ -35,6 +40,7 @@ jobs:
   build:
     uses: ./.github/workflows/_docker-build.yml
     with:
+      context: ${{ inputs.context }} 
       dockerfile: ${{ inputs.dockerfile }}
       image_name: local-build
       tag: ${{ inputs.tag }}
