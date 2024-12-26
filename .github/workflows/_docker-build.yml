@@ -95,6 +95,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.image_name }}-${{ env.PLATFORM_NAME }}
+          name: ${{ inputs.image_name }}-${{ inputs.tag }}-${{ env.PLATFORM_NAME }}
           path: ${{ env.IMAGE_TAR }}
           compression-level: 0
+          retention-days: 1
