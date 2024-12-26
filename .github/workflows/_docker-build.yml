@@ -91,8 +91,10 @@ jobs:
           IMAGE_TAR="${{ inputs.image_name }}_${{ inputs.tag }}_${PLATFORM_NAME}.tar"
           docker save -o "$IMAGE_TAR" ${{ inputs.image_name }}:${{ inputs.tag }}
           echo "IMAGE_TAR=$IMAGE_TAR" >> $GITHUB_ENV
+          echo "PLATFORM_NAME=$PLATFORM_NAME" >> $GITHUB_ENV
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.image_name }}-${{ matrix.platform }}
+          name: ${{ inputs.image_name }}-${{ env.PLATFORM_NAME }}
           path: ${{ env.IMAGE_TAR }}
+          compression-level: 0
