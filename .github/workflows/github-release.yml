@@ -6,6 +6,7 @@ on:
       tag:
         required: true
         type: string
+        description: "GitHub release tag (semver)."
 
 jobs:
   create-release:
