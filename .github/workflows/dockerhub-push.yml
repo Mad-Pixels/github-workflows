@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Docker images artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: ./images
 
@@ -61,6 +61,30 @@ jobs:
         with:
           username: ${{ secrets.dockerhub-username }}
           password: ${{ secrets.dockerhub-token }}
+
+      - name: Load and Push Images
+        run: |
+          echo "Directory contents:"
+          ls -R ./images/
+         
+          for TARBALL in ./images/local-build-${{ inputs.tag }}-*/*.tar; do
+            echo "Loading $TARBALL..."
+            docker load -i "$TARBALL"
+            # Get platform from filename
+            PLATFORM=$(basename $(dirname "$TARBALL") | sed 's/local-build-.*-//')
+            # Tag loaded image with platform suffix
+            docker tag "local-build:${{ inputs.tag }}" "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-$PLATFORM"
+          done
+
+          # Push platform-specific images
+          for PLATFORM in linux_amd64 linux_arm64; do
+            docker push "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-$PLATFORM"
+          done
+
+          MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
+          docker buildx imagetools create --tag "$MANIFEST_TAG" \
+            "$MANIFEST_TAG-linux_amd64" \
+            "$MANIFEST_TAG-linux_arm64"
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
