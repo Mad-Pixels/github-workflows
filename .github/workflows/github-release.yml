@@ -1,15 +1,12 @@
-# .github/workflows/_github-release.yml
 name: GitHub Release
 
 on:
   workflow_call:
     inputs:
-      version:
+      release:
         required: true
         type: string
-      working-directory:
-        required: true
-        type: string
+        description: "Release version"
       binaries:
         required: true
         type: string
