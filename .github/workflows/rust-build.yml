@@ -113,6 +113,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.artifacts }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}
+          name: ${{ matrix.crate }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}
           path: artifacts/
           if-no-files-found: error
