@@ -81,21 +81,18 @@ jobs:
 
      - name: Build and Push
        run: |
-         BUILD_ARGS=""
-         for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
-           BUILD_ARGS="$BUILD_ARGS $arg"
-         done
+        BUILD_ARGS=""
+        for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
+          BUILD_ARGS="$BUILD_ARGS $arg"
+        done
 
-         # Строим с платформо-специфичным тегом
-         PLATFORM_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${{ matrix.platform }}"
-         
-         docker buildx build \
-            --platform ${{ matrix.platform }} \
-            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
-            ${BUILD_ARGS} \
-            -t "$PLATFORM_TAG" \
-            --push \
-            ${{ inputs.context }}
+        docker buildx build \
+           --platform ${{ inputs.platforms }} \
+           --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
+           ${BUILD_ARGS} \
+           -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}" \
+           --push \
+           ${{ inputs.context }}
 
      - name: Create Multi-Platform Manifest
        # Выполняем только после успешной сборки всех платформ
