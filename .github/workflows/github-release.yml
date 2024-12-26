@@ -69,8 +69,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          find artifacts -type f -name "entrypoint" | while read -r file; do
-            dir=$(dirname "$file")
-            name=$(basename "$dir")
-            gh release upload ${{ steps.tag.outputs.TAG }} "$file" --name "$name" --clobber
+          cd artifacts
+          find . -type f | while read -r file; do
+            name=${file#./}  # Удаляем ./ из начала пути
+            gh release upload ${{ steps.tag.outputs.TAG }} "$file" --clobber
           done
