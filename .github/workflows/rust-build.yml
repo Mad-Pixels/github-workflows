@@ -20,7 +20,7 @@ on:
 
 jobs:
   discover:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       crates: ${{ steps.find.outputs.list }}
   
@@ -53,11 +53,11 @@ jobs:
     strategy:
       matrix:
         platform:
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: x86_64-unknown-linux-musl
             platform: linux
             arch: amd64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             target: aarch64-unknown-linux-musl
             platform: linux
             arch: arm
@@ -111,7 +111,7 @@ jobs:
           OUT_NAME="${{ matrix.crate }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}"
           cp "$BIN" "artifacts/${OUT_NAME}"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifacts }}
           path: artifacts/
