@@ -6,24 +6,30 @@ on:
       dockerfile:
         required: true
         type: string
-      repository:
+        description: "Path to Dockerfile (relative to context)"
+      image_name:
         required: true
         type: string
+        description: "Полное имя репозитория. Пример: myuser/myrepo"
       tag:
         required: true
         type: string
+        description: "Тег для образа (без архитектуры). Пример: v1.0.0"
       build_args:
         required: false
         type: string
         default: "{}"
+        description: 'JSON-объект аргументов сборки. Пример: {"ARG1":"value1"}'
       platforms:
         required: false
         type: string
         default: "linux/amd64,linux/arm64"
+        description: "Список платформ через запятую"
       context:
         required: false
         type: string
         default: "."
+        description: "Путь к контексту сборки Docker"
     secrets:
       dockerhub-username:
         required: true
@@ -36,14 +42,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      # Скачиваем контекст, если он был загружен ранее через upload-artifact
       - name: Download Context
-        if: inputs.context != '.'
+        if: ${{ inputs.context != '.' }}
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.context }}
           path: ${{ inputs.context }}
 
-      - name: Login to DockerHub
+      - name: Docker login
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.dockerhub-username }}
@@ -56,16 +63,17 @@ jobs:
 
       - name: Build multi-arch and push
         run: |
-          # Если у вас есть build args в JSON, превратим их в --build-arg
+          # Превращаем JSON build_args в "--build-arg KEY=VALUE"
           BUILD_ARGS=""
           for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
             BUILD_ARGS="$BUILD_ARGS $arg"
           done
 
+          # Собираем всё за один раз, пушим под одним тегом
           docker buildx build \
             --platform ${{ inputs.platforms }} \
             --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
             $BUILD_ARGS \
-            -t madpixels/${{ inputs.repository }}:${{ inputs.tag }} \
+            -t ${{ inputs.image_name }}:${{ inputs.tag }} \
             --push \
             ${{ inputs.context }}
