@@ -34,8 +34,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          echo '${{ inputs.platforms }}' | \
-          jq -cR '{ platform: split(",") }' >> $GITHUB_OUTPUT
+          echo "matrix=$(echo '${{ inputs.platforms }}' | jq -cR '{ platform: split(",") }')" >> $GITHUB_OUTPUT
 
   build:
     needs: discover
