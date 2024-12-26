@@ -81,7 +81,7 @@ jobs:
             --platform ${{ matrix.platform }} \
             --file docker-context/${{ inputs.dockerfile }} \
             $BUILD_ARGS \
-            -t ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }} \
+            -t ${{ inputs.image_name }}:${{ inputs.tag }} \
             --load \
             ${{ inputs.context }}
 
