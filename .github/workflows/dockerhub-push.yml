@@ -1,109 +1,71 @@
 name: Docker Build
 
 on:
- workflow_call:
-   inputs:
-     dockerfile:
-       required: true
-       type: string
-       description: "Path to Dockerfile"
-     image_name:
-       required: true
-       type: string
-       description: "Local image name (without tag)" 
-     tag:
-       required: true
-       type: string
-       description: "Image tag"
-     repository:
-       required: true
-       type: string
-       description: "DockerHub repository name"
-     build_args:
-       required: false
-       type: string
-       description: "JSON object of build args"
-       default: "{}"
-     platforms: 
-       required: false
-       type: string
-       description: "Comma-separated list of platforms"
-       default: "linux/amd64,linux/arm64"
-     context:
-       required: false
-       type: string
-       default: "."
-       description: "Docker build context path"
-   secrets:
-     dockerhub-username:
-       required: true
-     dockerhub-token:
-       required: true
+  workflow_call:
+    inputs:
+      dockerfile:
+        required: true
+        type: string
+      repository:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
+      build_args:
+        required: false
+        type: string
+        default: "{}"
+      platforms:
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
+      context:
+        required: false
+        type: string
+        default: "."
+    secrets:
+      dockerhub-username:
+        required: true
+      dockerhub-token:
+        required: true
 
 jobs:
- discover:
-   runs-on: ubuntu-latest
-   outputs:
-     matrix: ${{ steps.set-matrix.outputs.matrix }}
-   steps:
-     - id: set-matrix
-       run: |
-         echo "matrix=$(echo '${{ inputs.platforms }}' | jq -cR '{ platform: split(",") }')" >> $GITHUB_OUTPUT
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
- build-and-push:
-   needs: discover
-   runs-on: ubuntu-latest
-   strategy:
-     matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
-     fail-fast: false
+      - name: Download Context
+        if: inputs.context != '.'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.context }}
+          path: ${{ inputs.context }}
 
-   steps:
-     - uses: actions/checkout@v3
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.dockerhub-username }}
+          password: ${{ secrets.dockerhub-token }}
 
-     - name: Download Context
-       if: inputs.context != '.'
-       uses: actions/download-artifact@v4
-       with:
-         name: ${{ inputs.context }}
-         path: ${{ inputs.context }}
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+        with:
+          install: true
 
-     - name: Login to DockerHub
-       uses: docker/login-action@v2
-       with:
-         username: ${{ secrets.dockerhub-username }}
-         password: ${{ secrets.dockerhub-token }}
+      - name: Build multi-arch and push
+        run: |
+          # Если у вас есть build args в JSON, превратим их в --build-arg
+          BUILD_ARGS=""
+          for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
+            BUILD_ARGS="$BUILD_ARGS $arg"
+          done
 
-     - uses: docker/setup-qemu-action@v3
-     
-     - uses: docker/setup-buildx-action@v3
-       with:
-         install: true
-
-     - name: Build and Push
-       run: |
-         BUILD_ARGS=""
-         for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
-           BUILD_ARGS="$BUILD_ARGS $arg"
-         done
-
-         PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
-         PLATFORM_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}"
-         
-         docker buildx build \
-           --platform ${{ matrix.platform }} \
-           --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
-           ${BUILD_ARGS} \
-           -t "$PLATFORM_TAG" \
-           --push \
-           ${{ inputs.context }}
-
-     - name: Create Multi-Platform Manifest
-       if: success() && matrix.platform == matrix.platform[0]
-       run: |
-         PLATFORM_TAGS=""
-         for platform in $(echo '${{ inputs.platforms }}' | tr ',' ' '); do
-           PLATFORM_NAME=$(echo "$platform" | tr '/' '_')
-           PLATFORM_TAGS="$PLATFORM_TAGS madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}"
-         done
-
-         docker buildx imagetools create -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}" $PLATFORM_TAGS
+          docker buildx build \
+            --platform ${{ inputs.platforms }} \
+            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
+            $BUILD_ARGS \
+            -t madpixels/${{ inputs.repository }}:${{ inputs.tag }} \
+            --push \
+            ${{ inputs.context }}
