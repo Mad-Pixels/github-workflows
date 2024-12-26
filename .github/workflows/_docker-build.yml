@@ -72,12 +72,16 @@ jobs:
       - name: Build Docker image (no push)
         id: docker_build
         run: |
+          BUILD_ARGS=""
+          for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
+            BUILD_ARGS="$BUILD_ARGS $arg"
+          done
+          
           docker buildx build \
             --platform ${{ matrix.platform }} \
-            --file ${{ inputs.dockerfile }} \
-            --build-arg BUILD_ARGS='${{ inputs.build_args }}' \
-            --build-arg SOME_ARG=123 \
-            -t ${{ inputs.image_name }}:${{ inputs.tag }} \
+            --file docker-context/${{ inputs.dockerfile }} \
+            $BUILD_ARGS \
+            -t ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }} \
             --load \
             ${{ inputs.context }}
 
