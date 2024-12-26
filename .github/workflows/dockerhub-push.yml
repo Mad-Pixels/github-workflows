@@ -81,41 +81,29 @@ jobs:
 
      - name: Build and Push
        run: |
-        BUILD_ARGS=""
-        for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
-          BUILD_ARGS="$BUILD_ARGS $arg"
-        done
+         BUILD_ARGS=""
+         for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
+           BUILD_ARGS="$BUILD_ARGS $arg"
+         done
 
-        PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
-        docker buildx build \
+         PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
+         PLATFORM_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}"
+         
+         docker buildx build \
            --platform ${{ matrix.platform }} \
            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
            ${BUILD_ARGS} \
-           -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}" \
+           -t "$PLATFORM_TAG" \
            --push \
            ${{ inputs.context }}
 
      - name: Create Multi-Platform Manifest
-       if: always() && !failure() && !cancelled()
-       run: |
-        MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
-        
-        docker buildx imagetools create -t "$MANIFEST_TAG" \
-          "$MANIFEST_TAG-linux_amd64" \
-          "$MANIFEST_TAG-linux_arm64"
-
-     # Wait for all platform builds to complete before creating manifest
-     - name: Create Multi-Platform Manifest
        if: success() && matrix.platform == matrix.platform[0]
        run: |
-         MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
-         
-         # Platform specific tags
-         TAGS=""
+         PLATFORM_TAGS=""
          for platform in $(echo '${{ inputs.platforms }}' | tr ',' ' '); do
            PLATFORM_NAME=$(echo "$platform" | tr '/' '_')
-           TAGS="$TAGS $MANIFEST_TAG-$PLATFORM_NAME"
+           PLATFORM_TAGS="$PLATFORM_TAGS madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}"
          done
 
-         # Create and push manifest
-         docker buildx imagetools create --tag "$MANIFEST_TAG" $TAGS
+         docker buildx imagetools create -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}" $PLATFORM_TAGS
