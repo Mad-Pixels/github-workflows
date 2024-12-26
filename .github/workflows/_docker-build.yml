@@ -60,14 +60,14 @@ jobs:
             --file ${{ inputs.dockerfile }} \
             --build-arg BUILD_ARGS='${{ inputs.build_args }}' \
             --build-arg SOME_ARG=123 \
-            -t ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }} \
+            -t ${{ inputs.image_name }}:${{ inputs.tag }} \
             --load \
             .
 
       - name: Save Docker image as artifact
         run: |
           IMAGE_TAR="${{ inputs.image_name }}_${{ inputs.tag }}_${{ matrix.platform }}.tar"
-          docker save -o $IMAGE_TAR ${{ inputs.image_name }}:${{ inputs.tag }}-${{ matrix.platform }}
+          docker save -o $IMAGE_TAR ${{ inputs.image_name }}:${{ inputs.tag }}
           echo "IMAGE_TAR=$IMAGE_TAR" >> $GITHUB_ENV
 
       - uses: actions/upload-artifact@v3
