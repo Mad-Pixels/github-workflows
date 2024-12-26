@@ -64,6 +64,11 @@ jobs:
         with:
           install: true
 
+      - name: Check Context
+        run: |
+          echo "Docker context contents:"
+          ls -la docker-context/
+
       - name: Build Docker image (no push)
         id: docker_build
         run: |
