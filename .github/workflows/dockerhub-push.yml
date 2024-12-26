@@ -86,23 +86,23 @@ jobs:
           BUILD_ARGS="$BUILD_ARGS $arg"
         done
 
+        PLATFORM_NAME=$(echo "${{ matrix.platform }}" | tr '/' '_')
         docker buildx build \
-           --platform ${{ inputs.platforms }} \
+           --platform ${{ matrix.platform }} \
            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
            ${BUILD_ARGS} \
-           -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}" \
+           -t "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-${PLATFORM_NAME}" \
            --push \
            ${{ inputs.context }}
 
      - name: Create Multi-Platform Manifest
-       # Выполняем только после успешной сборки всех платформ
        if: always() && !failure() && !cancelled()
        run: |
-         MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
-         
-         docker buildx imagetools create -t "$MANIFEST_TAG" \
-           "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux/amd64" \
-           "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux/arm64"
+        MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
+        
+        docker buildx imagetools create -t "$MANIFEST_TAG" \
+          "$MANIFEST_TAG-linux_amd64" \
+          "$MANIFEST_TAG-linux_arm64"
 
      # Wait for all platform builds to complete before creating manifest
      - name: Create Multi-Platform Manifest
