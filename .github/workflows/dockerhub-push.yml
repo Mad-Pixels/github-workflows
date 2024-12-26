@@ -28,7 +28,7 @@ on:
       context:
         required: false
         type: string
-        default: "."
+        default: "docker-context"
         description: "Docker build context path"
     secrets:
       dockerhub-username:
@@ -40,7 +40,11 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: Download Docker Context
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.context }}
+          path: ${{ inputs.context }}
 
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -67,6 +71,6 @@ jobs:
             --platform ${{ inputs.platforms }} \
             --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
             $BUILD_ARGS \
-            -t madpixels/${{ inputs.repository }}:${{ inputs.tag }} \
+            -t ${{ inputs.repository }}:${{ inputs.tag }} \
             --push \
             ${{ inputs.context }}
