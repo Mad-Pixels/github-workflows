@@ -1,4 +1,4 @@
-name: Docker Build
+name: DockerHub Push
 
 on:
   workflow_call:
@@ -6,30 +6,30 @@ on:
       dockerfile:
         required: true
         type: string
-        description: "Path to Dockerfile (relative to context)"
-      image_name:
+        description: "Path to Dockerfile"
+      repository:
         required: true
         type: string
-        description: "Полное имя репозитория. Пример: myuser/myrepo"
+        description: "DockerHub repository name"
       tag:
         required: true
         type: string
-        description: "Тег для образа (без архитектуры). Пример: v1.0.0"
+        description: "Image tag"
       build_args:
         required: false
         type: string
+        description: "JSON object of build args"
         default: "{}"
-        description: 'JSON-объект аргументов сборки. Пример: {"ARG1":"value1"}'
       platforms:
         required: false
         type: string
+        description: "Comma-separated list of platforms"
         default: "linux/amd64,linux/arm64"
-        description: "Список платформ через запятую"
       context:
         required: false
         type: string
         default: "."
-        description: "Путь к контексту сборки Docker"
+        description: "Docker build context path"
     secrets:
       dockerhub-username:
         required: true
@@ -37,43 +37,48 @@ on:
         required: true
 
 jobs:
-  build-and-push:
+  build:
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      context: ${{ inputs.context }} 
+      dockerfile: ${{ inputs.dockerfile }}
+      image_name: local-build
+      tag: ${{ inputs.tag }}
+      build_args: ${{ inputs.build_args }}
+      platforms: ${{ inputs.platforms }}
+
+  push:
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      # Скачиваем контекст, если он был загружен ранее через upload-artifact
-      - name: Download Context
-        if: ${{ inputs.context != '.' }}
+      - name: Download Docker images artifacts
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.context }}
-          path: ${{ inputs.context }}
+          path: ./images
 
-      - name: Docker login
+      - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.dockerhub-username }}
           password: ${{ secrets.dockerhub-token }}
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
-      - name: Build multi-arch and push
+      - name: Load and Push Images
         run: |
-          # Превращаем JSON build_args в "--build-arg KEY=VALUE"
-          BUILD_ARGS=""
-          for arg in $(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"'); do
-            BUILD_ARGS="$BUILD_ARGS $arg"
-          done
+          # Загружаем и пушим образы с единым тегом
+          MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
 
-          # Собираем всё за один раз, пушим под одним тегом
-          docker buildx build \
-            --platform ${{ inputs.platforms }} \
-            --file ${{ inputs.context }}/${{ inputs.dockerfile }} \
-            $BUILD_ARGS \
-            -t ${{ inputs.image_name }}:${{ inputs.tag }} \
-            --push \
-            ${{ inputs.context }}
+          echo "Creating and pushing multi-arch manifest: $MANIFEST_TAG"
+
+          docker buildx create --name multi-builder --use || true
+
+          # Создаём и пушим общий манифест
+          docker buildx imagetools create --tag "$MANIFEST_TAG" \
+            madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux/amd64 \
+            madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux/arm64
+
+          echo "Multi-arch manifest created successfully."
