@@ -64,22 +64,15 @@ jobs:
 
       - name: Load and Push Images
         run: |
-          echo "Directory contents:"
-          ls -R ./images/
-         
-          for TARBALL in ./images/local-build-${{ inputs.tag }}-*/*.tar; do
+          for TARBALL in ./images/*/*.tar; do
             echo "Loading $TARBALL..."
             docker load -i "$TARBALL"
-            # Get platform from filename
             PLATFORM=$(basename $(dirname "$TARBALL") | sed 's/local-build-.*-//')
-            # Tag loaded image with platform suffix
             docker tag "local-build:${{ inputs.tag }}" "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-$PLATFORM"
           done
 
-          # Push platform-specific images
-          for PLATFORM in linux_amd64 linux_arm64; do
-            docker push "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-$PLATFORM"
-          done
+          docker push "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux_amd64"
+          docker push "madpixels/${{ inputs.repository }}:${{ inputs.tag }}-linux_arm64"
 
           MANIFEST_TAG="madpixels/${{ inputs.repository }}:${{ inputs.tag }}"
           docker buildx imagetools create --tag "$MANIFEST_TAG" \
