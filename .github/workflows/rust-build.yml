@@ -56,11 +56,11 @@ jobs:
           - os: ubuntu-24.04
             target: aarch64-unknown-linux-musl
             platform: linux
-            arch: arm
+            arch: arm64
           - os: macos-latest
             target: aarch64-apple-darwin
             platform: darwin
-            arch: arm
+            arch: arm64
         crate: ${{ fromJson(needs.discover.outputs.crates) }}
       fail-fast: true
 
