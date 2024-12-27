@@ -1,0 +1,114 @@
+name: Rust Build
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        required: false
+        default: ""
+        type: string
+        description: "Directory containing Rust project (Cargo.toml)"
+      crates-path:
+        required: false
+        default: ""
+        type: string
+        description: "Path to binary crates directory"
+
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    outputs:
+      crates: ${{ steps.find.outputs.list }}
+  
+    steps:
+      - uses: actions/checkout@v3
+    
+      - name: Find crates
+        id: find
+        run: |
+          DIR="${{ inputs.working-directory }}/${{ inputs.crates-path }}"
+          if [ -z "$DIR" ]; then
+            DIR="."
+          fi
+          if [ ! -d "$DIR" ]; then
+            echo "Error: Directory not found: $DIR"
+            exit 1
+          fi
+          CRATES=$(find "$DIR" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+          if [ -z "$CRATES" ]; then
+            echo "Error: No crates found in directory: $DIR"
+            exit 1
+          fi
+          echo "list=$CRATES" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: discover
+    runs-on: ${{ matrix.platform.os }}
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        platform:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            platform: linux
+            arch: amd64
+          - os: ubuntu-24.04
+            target: aarch64-unknown-linux-musl
+            platform: linux
+            arch: arm64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            platform: darwin
+            arch: arm64
+        crate: ${{ fromJson(needs.discover.outputs.crates) }}
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.rustup
+          key: build-${{ matrix.platform.target }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+          restore-keys: build-${{ matrix.platform.target }}
+
+      - name: Install Cross
+        if: matrix.platform.platform == 'linux'
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Build
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          echo "Building ${{ matrix.crate }} for ${{ matrix.platform.platform }}_${{ matrix.platform.arch }}"
+          if [ "${{ matrix.platform.platform }}" = "linux" ]; then
+            cross build --release --target ${{ matrix.platform.target }} -p "${{ matrix.crate }}"
+          else
+            cargo build --release --target ${{ matrix.platform.target }} -p "${{ matrix.crate }}"
+          fi
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          BIN="${{ inputs.working-directory }}/target/${{ matrix.platform.target }}/release/${{ matrix.crate }}"
+          if [ ! -f "$BIN" ]; then
+            echo "Error: Binary not found: $BIN"
+            exit 1
+          fi
+          OUT_NAME="${{ matrix.crate }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}"
+          cp "$BIN" "artifacts/${OUT_NAME}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.crate }}_${{ matrix.platform.platform }}_${{ matrix.platform.arch }}
+          path: artifacts/
+          if-no-files-found: error

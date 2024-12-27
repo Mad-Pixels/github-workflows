@@ -1,0 +1,77 @@
+name: GitHub Release
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+        description: "GitHub release tag (semver)."
+
+jobs:
+  create-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag name
+        id: tag
+        run: echo "TAG=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Check for artifacts
+        run: |
+          if [ ! -d "artifacts" ] || [ -z "$(ls -A artifacts)" ]; then
+            echo "No artifacts found to upload!"
+            exit 1
+          fi
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          if ! LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            echo "No previous tags found, using first commit"
+            LAST_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "Found last tag: $LAST_TAG"
+          echo "Current tag: ${{ steps.tag.outputs.TAG }}"
+
+          if ! git log "$LAST_TAG..HEAD" --pretty=format:"- %s [%h] (by %an)" > release-notes.txt; then
+            echo "Failed to generate release notes"
+            exit 1
+          fi
+
+          NOTES="$(cat release-notes.txt)"
+          echo "NOTES<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.tag.outputs.TAG }} \
+            --title "Release ${{ steps.tag.outputs.TAG }}" \
+            --notes "${{ steps.notes.outputs.NOTES }}"
+
+      - name: Upload Release Assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd artifacts
+          find . -type f | while read -r file; do
+            name=${file#./}  # Удаляем ./ из начала пути
+            gh release upload ${{ steps.tag.outputs.TAG }} "$file" --clobber
+          done
