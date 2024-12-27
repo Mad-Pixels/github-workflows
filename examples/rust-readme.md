@@ -39,13 +39,18 @@ The [github-check-tag.yml](https://github.com/Mad-Pixels/github-workflows/blob/m
 - Output Handling: Provides an output (is_main) to conditionally execute subsequent jobs.
 
 ### GitHub Release (general flow)
-Triggers on pushes that create version tags following the semantic versioning pattern (e.g., `v1.2.3`).
+The [github-release.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/github-release.yml) workflow triggers on pushes that create version tags following the semantic versioning pattern (e.g., `v1.2.3`).
 
 #### Key Features:
 - Tag Verification: Ensures that releases are only created from the main branch.
 - Add artifacts: Add artifacts to release.
 - Release Publishing: Creates a GitHub release with the generated artifacts.
 Release Publishing: Creates a GitHub release with the generated artifacts.
+
+#### Intputs:
+| Input Name | Required | Default | Type | Description                |
+|------------|----------|---------|------|----------------------------|
+| tag        | Yes      | ""      | N/A  | GitHub release tag (semver)|
 
 ## Using Workflows
 The workflows [rust-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-build.yml) and [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-check.yml) can be reused across different CI/CD scenarios. Below are examples of how to integrate these workflows into your project.
