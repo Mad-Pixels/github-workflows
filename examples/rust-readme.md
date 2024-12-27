@@ -13,10 +13,10 @@ The [rust-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.g
 - Artifact Management: Collects and uploads build artifacts for further use.
 
 ##### Intputs:
-| Input Name        | Required | Default     | Type   | Description |
-|-------------------|----------|-------------|--------|-------------|
+| Input Name        | Required | Default     | Type   | Description                      |
+|-------------------|----------|-------------|--------|----------------------------------|
 | working-directory | No       | ""          | String | Directory containing Rust project|
-| crates-path       | No       | ""          | String | Path to binary crates directory |
+| crates-path       | No       | ""          | String | Path to binary crates directory  |
 
 ### Rust Checks
 The [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-check.yml) workflow focuses on code quality and integrity by running tests, formatting checks, and linting using Clippy.
@@ -27,8 +27,8 @@ The [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.g
 - Failure Handling: Cleans caches upon failure to ensure consistent state.
 
 ##### Intputs:
-| Input Name        | Required | Default     | Type   | Description |
-|-------------------|----------|-------------|--------|-------------|
+| Input Name        | Required | Default     | Type   | Description                      |
+|-------------------|----------|-------------|--------|----------------------------------|
 | working-directory | No       | ""          | String | Directory containing Rust project|
 
 ## Using Workflows
