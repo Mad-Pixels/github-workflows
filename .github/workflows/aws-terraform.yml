@@ -52,13 +52,13 @@ jobs:
       #     echo "TF_VAR_aws_region=${{ secrets.TF_VAR_AWS_REGION }}" >> $GITHUB_ENV
       #     echo "TF_VAR_acm_crt=${{ secrets.TF_VAR_ACM_CRT }}" >> $GITHUB_ENV
 
-      # - name: Debug Environment Variables
-      #   run: |
-      #     echo "All environment variables:"
-      #     env | sort
+      - name: Debug Environment Variables
+        run: |
+          echo "All environment variables:"
+          env | sort
           
-      #     echo -e "\nTF_VAR variables:"
-      #     env | grep '^TF_VAR_' || true
+          echo -e "\nTF_VAR variables:"
+          env | grep '^TF_VAR_' || true
 
       - name: Invoke Terraform
         run: |
