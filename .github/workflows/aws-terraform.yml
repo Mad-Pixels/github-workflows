@@ -42,6 +42,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Debug Environment Variables
+        run: |
+          echo "All environment variables:"
+          env | sort
+          
+          echo -e "\nTF_VAR variables:"
+          env | grep '^TF_VAR_' || true
 
       - name: Invoke Terraform
         run: |
