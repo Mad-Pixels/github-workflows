@@ -7,40 +7,26 @@ on:
         required: false
         type: string
         default: "1.6.1"
-        description: "Terraform version, support [1.5.7, 1.6.0, 1.6.1]"
       terraform_command:
         required: true
         type: string
-        description: "Terraform command to execute (plan/apply/destroy)"
       terraform_workspace:
         required: false
         type: string
-        description: "Terraform workspace name"
       working_directory:
         required: false
         type: string
         default: "/terraform/provisioners/infra/"
-        description: "Directory containing Terraform files"
-      env_file:
-        required: false
+      environment:
+        required: true
         type: string
-        description: "Path to environment file with variables"
-      
-    secrets:
-      aws_access_key_id:
-        required: true
-      aws_secret_access_key:
-        required: true
-      backend_region:
-        required: true
-      backend_bucket:
-        required: true
-      backend_key:
-        required: true
+        description: "GitHub Environment name"
 
 jobs:
   terraform:
     runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,13 +35,12 @@ jobs:
         run: |
           docker run \
             -v $(pwd):/app \
-            -e AWS_ACCESS_KEY_ID=${{ secrets.aws_access_key_id }} \
-            -e AWS_SECRET_ACCESS_KEY=${{ secrets.aws_secret_access_key }} \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_KEY }} \
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
-            -e BACKEND_region=${{ secrets.backend_region }} \
-            -e BACKEND_bucket=${{ secrets.backend_bucket }} \
-            -e BACKEND_key=${{ secrets.backend_key }} \
-            --env-file /app/${{ inputs.env_file }} \
+            -e BACKEND_region=${{ secrets.AWS_BACKEND_REGION }} \
+            -e BACKEND_bucket=${{ secrets.AWS_BACKEND_BUCKET }} \
+            -e BACKEND_key=${{ secrets.AWS_BACKEND_KEY }} \
             madpixels/action-terraform:0.0.1_tf${{ inputs.terraform_version }}
