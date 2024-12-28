@@ -17,10 +17,10 @@ on:
         required: false
         type: string
         default: "/terraform/provisioners/infra/"
-      # environment:
-      #   required: true
-      #   type: string
-      #   description: "GitHub Environment name"
+      environment:
+        required: true
+        type: string
+        description: "GitHub Environment name"
     
     secrets:
       aws_access_key_id:
