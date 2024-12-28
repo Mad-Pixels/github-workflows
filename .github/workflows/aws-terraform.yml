@@ -48,7 +48,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Parse TF_VARS_JSON
-        if: secrets.TF_VARS_JSON != ''
         run: |
           echo "Parsing TF_VARS_JSON..."
 
