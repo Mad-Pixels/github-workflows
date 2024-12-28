@@ -51,10 +51,9 @@ jobs:
         env:
           RAW_JSON: ${{ secrets.TF_VARS_JSON }}
         run: |
-          echo "Parsing TF_VARS_JSON..."
-          
           if [ -n "$RAW_JSON" ]; then
-            echo "$RAW_JSON" | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+            # Исправляем: удалили TF_VAR_ из jq output, так как эти префиксы уже есть в именах
+            echo "$RAW_JSON" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
           else
             echo "No TF_VARS_JSON provided, skipping..."
           fi
