@@ -3,19 +3,6 @@ name: AWS Terraform
 on:
   workflow_call:
     inputs:
-      backend_region:
-        required: true
-        type: string
-        description: "AWS region for Terraform backend"
-      backend_bucket:
-        required: true
-        type: string
-        description: "S3 bucket name for Terraform backend"
-      backend_key:
-        required: true
-        type: string
-        description: "State file key in S3 bucket"
-      
       terraform_version:
         required: false
         type: string
@@ -33,7 +20,6 @@ on:
         required: false
         type: string
         description: 'JSON string of TF_VAR_ environment variables'
-
       working_directory:
         required: false
         type: string
@@ -45,6 +31,15 @@ on:
         required: true
       aws_secret_access_key:
         required: true
+      backend_region:
+        required: true
+        description: "AWS region for Terraform backend"
+      backend_bucket:
+        required: true
+        description: "S3 bucket name for Terraform backend"
+      backend_key:
+        required: true
+        description: "State file key in S3 bucket"
 
 jobs:
   terraform:
@@ -68,8 +63,8 @@ jobs:
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
-            -e BACKEND_region=${{ inputs.backend_region }} \
-            -e BACKEND_bucket=${{ inputs.backend_bucket }} \
-            -e BACKEND_key=${{ inputs.backend_key }} \
+            -e BACKEND_region=${{ secrets.backend_region }} \
+            -e BACKEND_bucket=${{ secrets.backend_bucket }} \
+            -e BACKEND_key=${{ secrets.backend_key }} \
             --env-file <(env | grep '^TF_VAR_') \
             madpixels/action-terraform:0.0.1_tf${{ inputs.terraform_version }}
