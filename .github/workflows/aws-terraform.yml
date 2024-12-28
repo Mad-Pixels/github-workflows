@@ -17,10 +17,10 @@ on:
         required: false
         type: string
         default: "/terraform/provisioners/infra/"
-      environment:
-        required: true
-        type: string
-        description: "GitHub Environment name"
+      # environment:
+      #   required: true
+      #   type: string
+      #   description: "GitHub Environment name"
     
     secrets:
       aws_access_key_id:
@@ -43,22 +43,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Set Terraform Variables
-        run: |
-          echo "TF_VAR_project=${{ secrets.TF_VAR_PROJECT }}" >> $GITHUB_ENV
-          echo "TF_VAR_domain=${{ secrets.TF_VAR_DOMAIN }}" >> $GITHUB_ENV
-          echo "TF_VAR_s3_static_name=${{ secrets.TF_VAR_S3_STATIC_NAME }}" >> $GITHUB_ENV
-          echo "TF_VAR_cf_distribution_index=${{ secrets.TF_VAR_CF_DISTRIBUTION_INDEX }}" >> $GITHUB_ENV
-          echo "TF_VAR_aws_region=${{ secrets.TF_VAR_AWS_REGION }}" >> $GITHUB_ENV
-          echo "TF_VAR_acm_crt=${{ secrets.TF_VAR_ACM_CRT }}" >> $GITHUB_ENV
+      # - name: Set Terraform Variables
+      #   run: |
+      #     echo "TF_VAR_project=${{ secrets.TF_VAR_PROJECT }}" >> $GITHUB_ENV
+      #     echo "TF_VAR_domain=${{ secrets.TF_VAR_DOMAIN }}" >> $GITHUB_ENV
+      #     echo "TF_VAR_s3_static_name=${{ secrets.TF_VAR_S3_STATIC_NAME }}" >> $GITHUB_ENV
+      #     echo "TF_VAR_cf_distribution_index=${{ secrets.TF_VAR_CF_DISTRIBUTION_INDEX }}" >> $GITHUB_ENV
+      #     echo "TF_VAR_aws_region=${{ secrets.TF_VAR_AWS_REGION }}" >> $GITHUB_ENV
+      #     echo "TF_VAR_acm_crt=${{ secrets.TF_VAR_ACM_CRT }}" >> $GITHUB_ENV
 
-      - name: Debug Environment Variables
-        run: |
-          echo "All environment variables:"
-          env | sort
+      # - name: Debug Environment Variables
+      #   run: |
+      #     echo "All environment variables:"
+      #     env | sort
           
-          echo -e "\nTF_VAR variables:"
-          env | grep '^TF_VAR_' || true
+      #     echo -e "\nTF_VAR variables:"
+      #     env | grep '^TF_VAR_' || true
 
       - name: Invoke Terraform
         run: |
@@ -72,5 +72,11 @@ jobs:
             -e BACKEND_region=${{ secrets.backend_region }} \
             -e BACKEND_bucket=${{ secrets.backend_bucket }} \
             -e BACKEND_key=${{ secrets.backend_key }} \
+            -e TF_VAR_project="madpixels-docs" \
+            -e TF_VAR_domain="docs.madpixels.io" \
+            -e TF_VAR_s3_static_name="static" \
+            -e TF_VAR_cf_distribution_index="index.html" \
+            -e TF_VAR_aws_region="us-east-1" \
+            -e TF_VAR_acm_crt='arn:aws:acm:us-east-1:586140253651:certificate/6c633adf-ffba-4ee6-93fd-69f8326c2f4d' \
             --env-file <(env | grep '^TF_VAR_') \
             madpixels/action-terraform:0.0.6_tf${{ inputs.terraform_version }}
