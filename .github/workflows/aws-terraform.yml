@@ -48,13 +48,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Parse TF_VARS_JSON
+        env:
+          RAW_JSON: ${{ secrets.TF_VARS_JSON }}
         run: |
           echo "Parsing TF_VARS_JSON..."
-
-          # TF_VARS_JSON — это наш JSON с ключами вида TF_VAR_*
-          # Превращаем его в набор строк "TF_VAR_name=value" и пишем в $GITHUB_ENV
-          echo "${{ secrets.TF_VARS_JSON }}" | jq -r 'to_entries | .[] | "\(.key)=\(.value)"' >> $GITHUB_ENV
-
+          
+          if [ -n "$RAW_JSON" ]; then
+            echo "$RAW_JSON" | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+          else
+            echo "No TF_VARS_JSON provided, skipping..."
+          fi
       - name: Debug Environment Variables
         run: |
           echo "All environment variables:"
