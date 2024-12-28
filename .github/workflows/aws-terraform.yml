@@ -16,10 +16,6 @@ on:
         required: false
         type: string
         description: "Terraform workspace name"
-      terraform_vars:
-        required: false
-        type: string
-        description: 'JSON string of TF_VAR_ environment variables'
       working_directory:
         required: false
         type: string
@@ -40,6 +36,9 @@ on:
       backend_key:
         required: true
         description: "State file key in S3 bucket"
+      terraform_vars:
+        required: false
+        description: 'JSON string of TF_VAR_ environment variables'
 
 jobs:
   terraform:
@@ -48,11 +47,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Parse Terraform variables
-        if: inputs.terraform_vars != ''
-        id: tf_vars
+      - name: Set Terraform Variables
         run: |
-          echo '${{ inputs.terraform_vars }}' | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+          echo '${{ secrets.terraform_variables }}' | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
 
       - name: Invoke Terraform
         run: |
