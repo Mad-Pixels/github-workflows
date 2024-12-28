@@ -72,11 +72,5 @@ jobs:
             -e BACKEND_region=${{ secrets.backend_region }} \
             -e BACKEND_bucket=${{ secrets.backend_bucket }} \
             -e BACKEND_key=${{ secrets.backend_key }} \
-            -e TF_VAR_project="madpixels-docs" \
-            -e TF_VAR_domain="docs.madpixels.io" \
-            -e TF_VAR_s3_static_name="static" \
-            -e TF_VAR_cf_distribution_index="index.html" \
-            -e TF_VAR_aws_region="us-east-1" \
-            -e TF_VAR_acm_crt='arn:aws:acm:us-east-1:586140253651:certificate/6c633adf-ffba-4ee6-93fd-69f8326c2f4d' \
             --env-file <(env | grep '^TF_VAR_') \
             madpixels/action-terraform:0.0.7_tf${{ inputs.terraform_version }}
