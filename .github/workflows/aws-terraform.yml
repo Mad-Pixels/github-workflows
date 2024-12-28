@@ -73,4 +73,4 @@ jobs:
             -e BACKEND_bucket=${{ secrets.backend_bucket }} \
             -e BACKEND_key=${{ secrets.backend_key }} \
             --env-file <(env | grep '^TF_VAR_') \
-            madpixels/action-terraform:0.0.3_tf${{ inputs.terraform_version }}
+            madpixels/action-terraform:0.0.4_tf${{ inputs.terraform_version }}
