@@ -1,0 +1,75 @@
+name: AWS Terraform
+
+on:
+  workflow_call:
+    inputs:
+      backend_region:
+        required: true
+        type: string
+        description: "AWS region for Terraform backend"
+      backend_bucket:
+        required: true
+        type: string
+        description: "S3 bucket name for Terraform backend"
+      backend_key:
+        required: true
+        type: string
+        description: "State file key in S3 bucket"
+      
+      terraform_version:
+        required: false
+        type: string
+        default: "1.6.1"
+        description: "Terraform version, support [1.5.7, 1.6.0, 1.6.1]"
+      terraform_command:
+        required: true
+        type: string
+        description: "Terraform command to execute (plan/apply/destroy)"
+      terraform_workspace:
+        required: false
+        type: string
+        description: "Terraform workspace name"
+      terraform_vars:
+        required: false
+        type: string
+        description: 'JSON string of TF_VAR_ environment variables'
+
+      working_directory:
+        required: false
+        type: string
+        default: "/terraform/provisioners/infra/"
+        description: "Directory containing Terraform files"
+      
+    secrets:
+      aws_access_key_id:
+        required: true
+      aws_secret_access_key:
+        required: true
+
+jobs:
+  terraform:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Parse Terraform variables
+        if: inputs.terraform_vars != ''
+        id: tf_vars
+        run: |
+          echo '${{ inputs.terraform_vars }}' | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+
+      - name: Invoke Terraform
+        run: |
+          docker run \
+            -v $(pwd):/app \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.aws_access_key_id }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.aws_secret_access_key }} \
+            -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
+            -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
+            -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
+            -e BACKEND_region=${{ inputs.backend_region }} \
+            -e BACKEND_bucket=${{ inputs.backend_bucket }} \
+            -e BACKEND_key=${{ inputs.backend_key }} \
+            --env-file <(env | grep '^TF_VAR_') \
+            madpixels/action-terraform:0.0.1_tf${{ inputs.terraform_version }}
