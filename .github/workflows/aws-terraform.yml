@@ -21,6 +21,10 @@ on:
         type: string
         default: "/terraform/provisioners/infra/"
         description: "Directory containing Terraform files"
+      env_file:
+        required: false
+        type: string
+        description: "Path to environment file with variables"
       
     secrets:
       aws_access_key_id:
@@ -29,16 +33,10 @@ on:
         required: true
       backend_region:
         required: true
-        description: "AWS region for Terraform backend"
       backend_bucket:
         required: true
-        description: "S3 bucket name for Terraform backend"
       backend_key:
         required: true
-        description: "State file key in S3 bucket"
-      terraform_vars:
-        required: false
-        description: 'JSON string of TF_VAR_ environment variables'
 
 jobs:
   terraform:
@@ -46,10 +44,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set Terraform Variables
-        run: |
-          echo '${{ secrets.terraform_variables }}' | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
 
       - name: Invoke Terraform
         run: |
@@ -63,5 +57,5 @@ jobs:
             -e BACKEND_region=${{ secrets.backend_region }} \
             -e BACKEND_bucket=${{ secrets.backend_bucket }} \
             -e BACKEND_key=${{ secrets.backend_key }} \
-            --env-file <(env | grep '^TF_VAR_') \
+            --env-file /app/${{ inputs.env_file }} \
             madpixels/action-terraform:0.0.1_tf${{ inputs.terraform_version }}
