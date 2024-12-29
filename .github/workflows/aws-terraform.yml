@@ -34,20 +34,11 @@ on:
       AWS_SESSION_TOKEN:
         required: false
 
-      # TERRAFORM_BACKEND_REGION:
-      #   required: true
-      # TERRAFORM_BACKEND_BUCKET:
-      #   required: true
-      # TERRAFORM_BACKEND_KEY:
-      #   required: true
-      # TERRAFORM_BACKEND_KMS_KEY_ID:
-      #   required: false
-      # TERRAFORM_BACKEND_ROLE_ARN:
-      #   required: false
-      # TERRAFORM_BACKEND_PROFILE:
-      #   required: false
-
       TF_VARS_JSON:
+        description: 'JSON string: {"project":"value", "domain":"value", ...}'
+        required: false
+      TF_BACKEND_JSON:
+        description: 'JSON string: {"region":"value", "bucket":"value", ...}'
         required: false
 
 jobs:
@@ -58,7 +49,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Parse TF_VARS_JSON
+      - name: Discover TF_VARS_JSON
         env:
           RAW_JSON: ${{ secrets.TF_VARS_JSON }}
         run: |
@@ -72,6 +63,21 @@ jobs:
           else
             echo "No TF_VARS_JSON provided, skipping..."
           fi
+      
+      - name: Discover TF_BACKEND_JSON
+        env:
+          RAW_JSON: ${{ secrets.TF_BACKEND_JSON }}
+        run: |
+          if [ -n "$RAW_JSON" ]; then
+            echo "$RAW_JSON" | jq -r 'to_entries | .[] | 
+              if (.key | startswith("BACKEND_")) then 
+                "\(.key)=\(.value)" 
+              else 
+                "BACKEND_\(.key)=\(.value)" 
+              end' >> $GITHUB_ENV
+          else
+            echo "No TF_BACKEND_JSON provided, skipping..."
+          fi
 
       - name: Invoke Terraform
         run: |
@@ -80,9 +86,6 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }} \
-            -e BACKEND_region="eu-central-1" \
-            -e BACKEND_bucket="tfstates-madpixels"  \
-            -e BACKEND_key="madpixels-docs" \
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
