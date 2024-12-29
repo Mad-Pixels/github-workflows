@@ -13,10 +13,10 @@ The [rust-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.g
 - Artifact Management: Collects and uploads build artifacts for further use.
 
 #### Intputs:
-| Input Name        | Required | Default     | Type   | Description                      |
-|-------------------|----------|-------------|--------|----------------------------------|
-| working-directory | No       | ""          | String | Directory containing Rust project|
-| crates-path       | No       | ""          | String | Path to binary crates directory  |
+| Input Name          | Required | Default     | Description                      |
+|---------------------|----------|-------------|----------------------------------|
+| `working-directory` | 🔴       | ""          | Directory containing Rust project|
+| `crates-path`       | 🔴       | ""          | Path to binary crates directory  |
 
 ### Rust Checks
 The [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-check.yml) workflow focuses on code quality and integrity by running tests, formatting checks, and linting using Clippy.
@@ -27,9 +27,9 @@ The [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.g
 - Failure Handling: Cleans caches upon failure to ensure consistent state.
 
 #### Intputs:
-| Input Name        | Required | Default     | Type   | Description                      |
-|-------------------|----------|-------------|--------|----------------------------------|
-| working-directory | No       | ""          | String | Directory containing Rust project|
+| Input Name          | Required | Default     | Description                      |
+|---------------------|----------|-------------|----------------------------------|
+| `working-directory` | 🔴       | ""          | Directory containing Rust project|
 
 ### GitHub Tag Check (General flow)
 The [github-check-tag.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/github-check-tag.yml) workflow verifies whether the pushed tag originates from the main branch.
@@ -48,9 +48,9 @@ The [github-release.yml](https://github.com/Mad-Pixels/github-workflows/blob/mai
 Release Publishing: Creates a GitHub release with the generated artifacts.
 
 #### Intputs:
-| Input Name | Required | Default | Type | Description                |
-|------------|----------|---------|------|----------------------------|
-| tag        | Yes      | ""      | N/A  | GitHub release tag (semver)|
+| Input Name | Required | Default | Description                |
+|------------|----------|---------|----------------------------|
+| `tag`      | 🟢       | ""      | GitHub release tag (semver)|
 
 ## Using Workflows
 The workflows [rust-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-build.yml) and [rust-check.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/rust-check.yml) can be reused across different CI/CD scenarios. Below are examples of how to integrate these workflows into your project.
