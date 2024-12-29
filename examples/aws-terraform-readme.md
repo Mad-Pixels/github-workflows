@@ -28,37 +28,65 @@ This workflow supports common Terraform operations such as plan and apply, with 
 | `AWS_ACCESS_KEY_ID`            | 🟢       | AWS access key ID for authentication.                              |
 | `AWS_SECRET_ACCESS_KEY`        | 🟢       | AWS secret access key for authentication.                          |
 | `AWS_SESSION_TOKEN`            | 🔴       | AWS session token (if temporary credentials are used).             |
-| `TERRAFORM_BACKEND_REGION`     | 🟢       | AWS region of the S3 bucket used for the Terraform backend.        |
-| `TERRAFORM_BACKEND_BUCKET`     | 🟢       | Name of the S3 bucket for the Terraform backend.                   |
-| `TERRAFORM_BACKEND_KEY`        | 🟢       | Key (file path) in the S3 bucket to store the Terraform state.     |
-| `TERRAFORM_BACKEND_KMS_KEY_ID` | 🔴       | AWS KMS key ID for encrypting the Terraform state.                 |
-| `TERRAFORM_BACKEND_ROLE_ARN`   | 🔴       | IAM role ARN to assume for accessing the Terraform backend.        |
-| `TERRAFORM_BACKEND_PROFILE`    | 🔴       | AWS profile to use for accessing the Terraform backend.            |
+| `TF_BACKEND_JSON`              | 🔴       | A JSON object containing Terraform backend variables               | 
 | `TF_VARS_JSON`                 | 🔴       | A JSON object containing variables for Terraform in TF_VAR_ format.|
 
-#### TF_VARS_JSON
+## Environment Variables
 
-> To ensure masking works correctly and does not conflict with GitHub's masking mechanism (which hides the entire output when a secret is found in a line), it is recommended to use a single secret in JSON format for all required `TF_VAR_` variables in the project. This approach allows Terraform variables to be passed securely without risking accidental exposure.
+### Overview
+GitHub Actions has a built-in masking mechanism that hides entire lines containing any secret value. This can make logs unreadable when multiple individual secrets are used. To avoid this, we use a single JSON-formatted secret for each configuration group, allowing for more precise control over sensitive data masking.
+
+### TF_VARS_JSON
+This secret manages all Terraform variables in a single JSON object, preventing GitHub's aggressive masking behavior. Instead of defining multiple individual secrets (which would trigger masking for any line containing them), use this consolidated approach.
 
 Valid formats:
 
-- With the `TF_VAR_` prefix:
-
+1. With `TF_VAR_` prefix (explicit):
 ```json
 {
   "TF_VAR_project": "my_project",
-  "TF_VAR_aws_region": "us-east-1"
+  "TF_VAR_aws_region": "us-east-1",
+  "TF_VAR_domain": "example.com"
 }
 ```
-
-- Without the TF_VAR_ prefix (the prefix will be added automatically during processing):
+2. Without prefix (prefix will be added automatically):
 ```json
 {
   "project": "my_project",
-  "aws_region": "us-east-1"
+  "aws_region": "us-east-1",
+  "domain": "example.com"
 }
 ```
-Using a single JSON secret prevents GitHub's built-in masking processes, ensuring the workflow functions correctly.
+
+### TF_BACKEND_JSON
+Similar to TF_VARS_JSON, this secret manages Terraform backend configuration in a single JSON object. This approach provides better log readability while maintaining security.
+
+Valid formats:
+
+1. With BACKEND_ prefix (explicit):
+```json
+{
+  "BACKEND_region": "us-east-1",
+  "BACKEND_bucket": "my-terraform-state",
+  "BACKEND_key": "terraform.tfstate"
+}
+```
+
+2. Without prefix (prefix will be added automatically):
+```json
+{
+  "region": "us-east-1",
+  "bucket": "my-terraform-state",
+  "key": "terraform.tfstate"
+}
+```
+
+### Benefits of Using JSON Secrets
+- Better Log Readability: Instead of GitHub masking entire lines containing any secret value, only the specific sensitive values are masked
+- Simplified Management: Manage related variables as a single unit instead of multiple individual secrets
+Consistent Masking: Ensures sensitive data is properly masked without affecting surrounding context
+- Flexible Format: Supports both prefixed and non-prefixed variable names
+- Reduced Configuration: Minimizes the number of GitHub secrets needed for your workflow
 
 ## Using Workflow example
 
@@ -83,11 +111,8 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
 
-      TERRAFORM_BACKEND_REGION: ${{ secrets.AWS_BACKEND_REGION }}
-      TERRAFORM_BACKEND_BUCKET: ${{ secrets.AWS_BACKEND_BUCKET }}
-      TERRAFORM_BACKEND_KEY: ${{ secrets.AWS_BACKEND_KEY }}
-
       TF_VARS_JSON: ${{ secrets.TF_VARS_JSON }}
+      TF_BACKEND_JSON: ${{ secrets.TF_BACKEND_JSON }}
 ```
 
 #### Result
