@@ -1,0 +1,93 @@
+name: AWS Terraform
+
+on:
+  workflow_call:
+    inputs:
+      terraform_version:
+        required: false
+        type: string
+        default: "1.6.1"
+        description: "Terraform version"
+      terraform_command:
+        required: true
+        type: string
+        description: "Terraform command: [plan / apply]"
+      terraform_workspace:
+        required: false
+        type: string
+        description: "Terraform workspace"
+      working_directory:
+        required: false
+        type: string
+        default: "terraform"
+        description: "Terraform source directory"
+      actions_verions:
+        required: true
+        type: string
+        description: "Ci-action image version (0.0.1)"
+    
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_SESSION_TOKEN:
+        required: false
+
+      TERRAFORM_BACKEND_REGION:
+        required: true
+      TERRAFORM_BACKEND_BUCKET:
+        required: true
+      TERRAFORM_BACKEND_KEY:
+        required: true
+      TERRAFORM_BACKEND_KMS_KEY_ID:
+        required: false
+      TERRAFORM_BACKEND_ROLE_ARN:
+        required: false
+      TERRAFORM_BACKEND_PROFILE:
+        required: false
+
+      TF_VARS_JSON:
+        required: false
+
+jobs:
+  terraform:
+    runs-on: ubuntu-24.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Parse TF_VARS_JSON
+        env:
+          RAW_JSON: ${{ secrets.TF_VARS_JSON }}
+        run: |
+          if [ -n "$RAW_JSON" ]; then
+            echo "$RAW_JSON" | jq -r 'to_entries | .[] | 
+              if (.key | startswith("TF_VAR_")) then 
+                "\(.key)=\(.value)" 
+              else 
+                "TF_VAR_\(.key)=\(.value)" 
+              end' >> $GITHUB_ENV
+          else
+            echo "No TF_VARS_JSON provided, skipping..."
+          fi
+
+      - name: Invoke Terraform
+        run: |
+          docker run \
+            -v $(pwd):/app \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            -e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }} \
+            -e BACKEND_region=${{ secrets.TERRAFORM_BACKEND_REGION }} \
+            -e BACKEND_bucket=${{ secrets.TERRAFORM_BACKEND_BUCKET }} \
+            -e BACKEND_key=${{ secrets.TERRAFORM_BACKEND_KEY }} \
+            -e BACKEND_kms_key_id=${{ secrets.TERRAFORM_BACKEND_KMS_KEY_ID }} \
+            -e BACKEND_role_arn=${{ secrets.TERRAFORM_BACKEND_ROLE_ARN }} \
+            -e BACKEND_profile=${{ secrets.TERRAFORM_BACKEND_PROFILE }} \
+            -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
+            -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
+            -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
+            --env-file <(env | grep '^TF_VAR_') \
+            madpixels/action-terraform:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
