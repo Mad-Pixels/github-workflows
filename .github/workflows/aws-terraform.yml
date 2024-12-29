@@ -54,15 +54,14 @@ jobs:
          TF_VARS_RAW: ${{ secrets.TF_VARS_JSON }}
        run: |
          echo "Parsing TF_VARS_JSON..."
+         mkdir -p .env
          if [ -n "$TF_VARS_RAW" ]; then
            echo "$TF_VARS_RAW" | jq -r 'to_entries | .[] | 
              if (.key | startswith("TF_VAR_")) then 
                "\(.key)=\(.value)" 
              else 
                "TF_VAR_\(.key)=\(.value)" 
-             end' > vars.env
-           cat vars.env >> $GITHUB_ENV
-           rm vars.env
+             end' > .env/tf_vars
          else
            echo "No TF_VARS_JSON provided, skipping..."
          fi
@@ -78,29 +77,29 @@ jobs:
                "\(.key)=\(.value)" 
              else 
                "BACKEND_\(.key)=\(.value)" 
-             end' > backend.env
-           cat backend.env >> $GITHUB_ENV
-           rm backend.env
+             end' > .env/backend_vars
          else
            echo "No TF_BACKEND_JSON provided, skipping..."
          fi
 
      - name: Invoke Terraform
        run: |
-         # Собираем все переменные в массивы
+         # Читаем переменные из файлов
          tf_vars=()
-         backend_vars=()
-         
-         # Перебираем все переменные окружения
-         while IFS='=' read -r key value; do
-           if [[ $key == TF_VAR_* ]]; then
+         if [ -f .env/tf_vars ]; then
+           while IFS='=' read -r key value; do
              tf_vars+=("-e $key=$value")
-           elif [[ $key == BACKEND_* ]]; then
-             backend_vars+=("-e $key=$value")
-           fi
-         done < <(env)
+           done < .env/tf_vars
+         fi
 
-         # Запускаем docker с собранными переменными
+         backend_vars=()
+         if [ -f .env/backend_vars ]; then
+           while IFS='=' read -r key value; do
+             backend_vars+=("-e $key=$value")
+           done < .env/backend_vars
+         fi
+
+         # Запускаем docker с переменными из файлов
          docker run \
            -v $(pwd):/app \
            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
@@ -112,3 +111,6 @@ jobs:
            ${tf_vars[@]} \
            ${backend_vars[@]} \
            madpixels/action-terraform:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
+
+         # Очищаем временные файлы
+         rm -rf .env
