@@ -34,18 +34,18 @@ on:
       AWS_SESSION_TOKEN:
         required: false
 
-      TERRAFORM_BACKEND_REGION:
-        required: true
-      TERRAFORM_BACKEND_BUCKET:
-        required: true
-      TERRAFORM_BACKEND_KEY:
-        required: true
-      TERRAFORM_BACKEND_KMS_KEY_ID:
-        required: false
-      TERRAFORM_BACKEND_ROLE_ARN:
-        required: false
-      TERRAFORM_BACKEND_PROFILE:
-        required: false
+      # TERRAFORM_BACKEND_REGION:
+      #   required: true
+      # TERRAFORM_BACKEND_BUCKET:
+      #   required: true
+      # TERRAFORM_BACKEND_KEY:
+      #   required: true
+      # TERRAFORM_BACKEND_KMS_KEY_ID:
+      #   required: false
+      # TERRAFORM_BACKEND_ROLE_ARN:
+      #   required: false
+      # TERRAFORM_BACKEND_PROFILE:
+      #   required: false
 
       TF_VARS_JSON:
         required: false
@@ -80,12 +80,9 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             -e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }} \
-            -e BACKEND_region=${{ secrets.TERRAFORM_BACKEND_REGION }} \
-            -e BACKEND_bucket=${{ secrets.TERRAFORM_BACKEND_BUCKET }} \
-            -e BACKEND_key=${{ secrets.TERRAFORM_BACKEND_KEY }} \
-            -e BACKEND_kms_key_id=${{ secrets.TERRAFORM_BACKEND_KMS_KEY_ID }} \
-            -e BACKEND_role_arn=${{ secrets.TERRAFORM_BACKEND_ROLE_ARN }} \
-            -e BACKEND_profile=${{ secrets.TERRAFORM_BACKEND_PROFILE }} \
+            -e BACKEND_region="eu-central-1" \
+            -e BACKEND_bucket="tfstates-madpixels"  \
+            -e BACKEND_key="madpixels-docs" \
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
