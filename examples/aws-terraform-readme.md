@@ -91,4 +91,7 @@ jobs:
 ```
 
 #### Result
+
+> With additional maskers for AWS output.
+
 ![Workflow](../media/aws-terraform.svg)
