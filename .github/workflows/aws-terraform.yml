@@ -53,28 +53,30 @@ jobs:
         env:
           RAW_JSON: ${{ secrets.TF_VARS_JSON }}
         run: |
+          echo "Parsing TF_VARS_JSON..."
           if [ -n "$RAW_JSON" ]; then
             echo "$RAW_JSON" | jq -r 'to_entries | .[] | 
               if (.key | startswith("TF_VAR_")) then 
                 "\(.key)=\(.value)" 
               else 
                 "TF_VAR_\(.key)=\(.value)" 
-              end' >> $GITHUB_ENV
+              end' >> $GITHUB_ENV 2>/dev/null
           else
             echo "No TF_VARS_JSON provided, skipping..."
           fi
-      
+    
       - name: Discover TF_BACKEND_JSON
         env:
           RAW_JSON: ${{ secrets.TF_BACKEND_JSON }}
         run: |
+          echo "Parsing TF_BACKEND_JSON..."
           if [ -n "$RAW_JSON" ]; then
             echo "$RAW_JSON" | jq -r 'to_entries | .[] | 
               if (.key | startswith("BACKEND_")) then 
                 "\(.key)=\(.value)" 
               else 
                 "BACKEND_\(.key)=\(.value)" 
-              end' >> $GITHUB_ENV
+              end' >> $GITHUB_ENV 2>/dev/null
           else
             echo "No TF_BACKEND_JSON provided, skipping..."
           fi
@@ -89,5 +91,5 @@ jobs:
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
-            --env-file <(env | grep '^TF_VAR_') \
+            --env-file <(env | grep -E '^(TF_VAR_|BACKEND_)') \
             madpixels/action-terraform:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
