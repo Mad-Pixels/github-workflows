@@ -25,7 +25,7 @@ on:
         required: true
         type: string
         description: "Ci-action image version (0.0.1)"
-    
+   
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
@@ -34,60 +34,79 @@ on:
       AWS_SESSION_TOKEN:
         required: false
 
-      TERRAFORM_BACKEND_REGION:
-        required: true
-      TERRAFORM_BACKEND_BUCKET:
-        required: true
-      TERRAFORM_BACKEND_KEY:
-        required: true
-      TERRAFORM_BACKEND_KMS_KEY_ID:
-        required: false
-      TERRAFORM_BACKEND_ROLE_ARN:
-        required: false
-      TERRAFORM_BACKEND_PROFILE:
-        required: false
-
       TF_VARS_JSON:
+        description: 'JSON string: {"project":"value", "domain":"value", ...}'
+        required: false
+      TF_BACKEND_JSON:
+        description: 'JSON string: {"region":"value", "bucket":"value", ...}'
         required: false
 
 jobs:
   terraform:
     runs-on: ubuntu-24.04
-    
+   
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Parse TF_VARS_JSON
+      - name: Discover TF_VARS_JSON
         env:
-          RAW_JSON: ${{ secrets.TF_VARS_JSON }}
+          TF_VARS_RAW: ${{ secrets.TF_VARS_JSON }}
         run: |
-          if [ -n "$RAW_JSON" ]; then
-            echo "$RAW_JSON" | jq -r 'to_entries | .[] | 
+          echo "Parsing TF_VARS_JSON..."
+          mkdir -p .env
+          if [ -n "$TF_VARS_RAW" ]; then
+            echo "$TF_VARS_RAW" | jq -r 'to_entries | .[] | 
               if (.key | startswith("TF_VAR_")) then 
                 "\(.key)=\(.value)" 
               else 
                 "TF_VAR_\(.key)=\(.value)" 
-              end' >> $GITHUB_ENV
+              end' > .env/tf_vars
           else
             echo "No TF_VARS_JSON provided, skipping..."
           fi
 
+      - name: Discover TF_BACKEND_JSON
+        env:
+          TF_BACKEND_RAW: ${{ secrets.TF_BACKEND_JSON }}
+        run: |
+          echo "Parsing TF_BACKEND_JSON..."
+          if [ -n "$TF_BACKEND_RAW" ]; then
+            echo "$TF_BACKEND_RAW" | jq -r 'to_entries | .[] | 
+              if (.key | startswith("BACKEND_")) then 
+                "\(.key)=\(.value)" 
+              else 
+                "BACKEND_\(.key)=\(.value)" 
+              end' > .env/backend_vars
+          else
+            echo "No TF_BACKEND_JSON provided, skipping..."
+          fi
+
       - name: Invoke Terraform
         run: |
+          tf_vars=()
+          if [ -f .env/tf_vars ]; then
+            while IFS='=' read -r key value; do
+              tf_vars+=("-e $key=$value")
+            done < .env/tf_vars
+          fi
+
+          backend_vars=()
+          if [ -f .env/backend_vars ]; then
+            while IFS='=' read -r key value; do
+              backend_vars+=("-e $key=$value")
+            done < .env/backend_vars
+          fi
+
           docker run \
             -v $(pwd):/app \
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-            -e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }} \
-            -e BACKEND_region=${{ secrets.TERRAFORM_BACKEND_REGION }} \
-            -e BACKEND_bucket=${{ secrets.TERRAFORM_BACKEND_BUCKET }} \
-            -e BACKEND_key=${{ secrets.TERRAFORM_BACKEND_KEY }} \
-            -e BACKEND_kms_key_id=${{ secrets.TERRAFORM_BACKEND_KMS_KEY_ID }} \
-            -e BACKEND_role_arn=${{ secrets.TERRAFORM_BACKEND_ROLE_ARN }} \
-            -e BACKEND_profile=${{ secrets.TERRAFORM_BACKEND_PROFILE }} \
+            ${AWS_SESSION_TOKEN:+-e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}} \
             -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
             -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
             -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
-            --env-file <(env | grep '^TF_VAR_') \
+            ${tf_vars[@]} \
+            ${backend_vars[@]} \
             madpixels/action-terraform:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
+            rm -rf .env
