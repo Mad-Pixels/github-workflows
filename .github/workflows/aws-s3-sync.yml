@@ -45,23 +45,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Discover TF_VARS_JSON
-        env:
-          TF_VARS_RAW: ${{ secrets.TF_VARS_JSON }}
-        run: |
-          echo "Parsing TF_VARS_JSON..."
-          mkdir -p .env
-          if [ -n "$TF_VARS_RAW" ]; then
-            echo "$TF_VARS_RAW" | jq -r 'to_entries | .[] | 
-              if (.key | startswith("TF_VAR_")) then 
-                "\(.key)=\(.value)" 
-              else 
-                "TF_VAR_\(.key)=\(.value)" 
-              end' > .env/tf_vars
-          else
-            echo "No TF_VARS_JSON provided, skipping..."
-          fi
-
       - name: Invoke Cli
         run: |
           docker run \
