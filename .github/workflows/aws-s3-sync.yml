@@ -30,12 +30,9 @@ on:
       AWS_SESSION_TOKEN:
         required: false
 
-      TF_VARS_JSON:
-        description: 'JSON string: {"project":"value", "domain":"value", ...}'
-        required: false
-      TF_BACKEND_JSON:
-        description: 'JSON string: {"region":"value", "bucket":"value", ...}'
-        required: false
+      BUCKET_DESTINATION:
+        required: true
+        description: "{ backet_name }/{ path }" 
 
 jobs:
   terraform:
