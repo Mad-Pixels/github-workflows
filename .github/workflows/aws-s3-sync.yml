@@ -3,10 +3,6 @@ name: AWS Terraform
 on:
   workflow_call:
     inputs:
-      bucket_destination:
-        required: true
-        type: string
-        description: "{ backet_name }/{ path }"
       files_exclude:
         required: false
         type: string
