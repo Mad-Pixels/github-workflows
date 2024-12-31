@@ -45,7 +45,7 @@ jobs:
             -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
             -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
             ${AWS_SESSION_TOKEN:+-e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}} \
-            -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
+            -e ACTION_WORKING_DIR=${{ inputs.working_directory }} \
             -e ACTION_AWS_CMD=s3_sync \
             -e ACTION_AWS_S3_DESTINATION=s3://${{ inputs.destination }} \
             -e ACTION_AWS_S3_DELETE=true \
