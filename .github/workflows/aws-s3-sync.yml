@@ -50,4 +50,4 @@ jobs:
             -e ACTION_AWS_S3_DESTINATION=s3://${{ inputs.destination }} \
             -e ACTION_AWS_S3_DELETE=true \
             -e ACTION_AWS_S3_EXCLUDE=${{ inputs.exclude }} \
-            madpixels/action-aws:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
+            madpixels/action-aws:${{ inputs.actions_verions }}_tf2.22.26
