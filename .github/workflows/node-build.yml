@@ -15,7 +15,7 @@ on:
         description: "Node.js version to use"
       artifacts-name:
         required: false
-        default: artifacts/
+        default: artifacts
         type: string
         description: "Name of the output artifacts"
 
