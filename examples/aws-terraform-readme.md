@@ -5,8 +5,6 @@ This guide provides a comprehensive overview of setting up Continuous Integratio
 
 ## Workflow Overview
 
-The  workflow is responsible for building Rust projects across multiple platforms and architectures. It discovers crates, caches dependencies, and produces build artifacts.
-
 The workflow defined in [aws-terraform.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/aws-terraform.yml) simplifies and secures Terraform operations using the [ci-actions](https://github.com/Mad-Pixels/ci-actions) project. This project acts as a wrapper for executing Terraform commands while masking sensitive information, ensuring the safety and confidentiality of secrets and variables.
 
 This workflow supports common Terraform operations such as plan and apply, with configurable parameters and secure integration with AWS.
