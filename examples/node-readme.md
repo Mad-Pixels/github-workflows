@@ -13,10 +13,11 @@ The [node-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.g
 - Artifact Management: Collects and uploads build artifacts for further use.
 
 #### Inputs:
-| Input Name          | Required | Default | Description                                     |
-|---------------------|----------|---------|-------------------------------------------------|
-| `working-directory` | 🔴       | ""      | Directory containing Vue project (package.json) |
-| `node-version`      | 🔴       | `20`    | Node.js version to use                          |
+| Input Name          | Required | Default     | Description                                     |
+|---------------------|----------|----------- -|-------------------------------------------------|
+| `working-directory` | 🔴       | ""          | Directory containing Vue project (package.json) |
+| `node-version`      | 🔴       | `20`        | Node.js version to use                          |
+| `artifacts-name`    | 🔴       | `artifacts` | Output artifacts name                           |
 
 ## Using Workflows
 The workflow [node-build.yml](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/workflows/node-build.yml) can be reused across different CI/CD scenarios. Below are examples of how to integrate this workflow into your project.

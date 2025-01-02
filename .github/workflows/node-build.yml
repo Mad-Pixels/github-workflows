@@ -13,6 +13,11 @@ on:
         default: "20"
         type: string
         description: "Node.js version to use"
+      artifacts-name:
+        required: false
+        default: artifacts/
+        type: string
+        description: "Name of the output artifacts"
 
 jobs:
   build:
@@ -49,6 +54,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: vue-dist
+          name: ${{ inputs.artifacts-name }}
           path: artifacts/dist/
           if-no-files-found: error
