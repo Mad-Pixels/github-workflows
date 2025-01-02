@@ -3,6 +3,14 @@ name: AWS Terraform
 on:
   workflow_call:
     inputs:
+      artifacts:
+        required: true
+        type: string
+        description: "Artifacts name"
+      actions_verions:
+        required: true
+        type: string
+        description: "Ci-action image version (0.0.1)"
       exclude:
         required: false
         type: string
@@ -13,10 +21,6 @@ on:
         type: string
         default: "terraform"
         description: "Terraform source directory"
-      actions_verions:
-        required: true
-        type: string
-        description: "Ci-action image version (0.0.1)"
    
     secrets:
       AWS_ACCESS_KEY_ID:
@@ -38,7 +42,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: vue-dist
+          name: ${{ intputs.artifacts }}
           path: dist_files
 
       - name: Invoke Cli
@@ -53,4 +57,4 @@ jobs:
             -e ACTION_AWS_S3_DESTINATION=s3://${{ secrets.BUCKET_DESTINATION }} \
             -e ACTION_AWS_S3_DELETE=true \
             -e ACTION_AWS_S3_EXCLUDE=${{ inputs.exclude }} \
-            madpixels/action-aws:${{ inputs.actions_verions }}_tf2.22.26
+            madpixels/action-aws:${{ inputs.actions_verions }}_aws2.22.26
