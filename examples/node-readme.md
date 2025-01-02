@@ -37,7 +37,7 @@ jobs:
   build:
     uses: Mad-Pixels/github-workflows/.github/workflows/node-build.yml@main
     with:
-      working-directory: "./frontend" # Directory containing Vue project
+      working-directory: "./frontend" # Directory containing project
       node-version: "20"              # Node.js version to use
 ```
 
@@ -69,19 +69,9 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: vue-dist
-          path: dist_files
-    
-  discover:
-    needs: [build]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
           name: dist
           path: dist_files
-
+    
   upload:
     needs: [discover]
     uses: Mad-Pixels/github-workflows/.github/workflows/aws-s3-sync.yml@main
