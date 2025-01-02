@@ -7,4 +7,4 @@
 </picture>
 
 # Workflows
-See [examples]("/examples")
+See [examples](/examples)
