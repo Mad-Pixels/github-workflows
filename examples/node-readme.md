@@ -57,6 +57,7 @@ jobs:
     uses: Mad-Pixels/github-workflows/.github/workflows/github-check-tag.yml@main
 
   build:
+    needs: [verify]
     uses: Mad-Pixels/github-workflows/.github/workflows/node-build.yml@main
     with:
       working-directory: ./app
