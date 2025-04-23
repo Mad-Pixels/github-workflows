@@ -4,109 +4,132 @@ on:
   workflow_call:
     inputs:
       terraform_version:
+        description: 'Terraform version to use'
         required: false
         type: string
-        default: "1.6.1"
-        description: "Terraform version"
+        default: '1.6.1'
+      terraform_dir:
+        description: 'Directory containing Terraform configuration'
+        required: true
+        type: string
       terraform_command:
+        description: 'Terraform command to run (plan or apply)'
         required: true
         type: string
-        description: "Terraform command: [plan / apply]"
-      terraform_workspace:
-        required: false
-        type: string
-        description: "Terraform workspace"
-      working_directory:
-        required: false
-        type: string
-        default: "terraform"
-        description: "Terraform source directory"
-      actions_verions:
+      backend_bucket:
+        description: 'S3 bucket for Terraform state'
         required: true
         type: string
-        description: "Ci-action image version (0.0.1)"
-   
+      backend_key:
+        description: 'S3 key for Terraform state'
+        required: true
+        type: string
+      backend_region:
+        description: 'AWS region for S3 backend'
+        required: true
+        type: string
+      workspace:
+        description: 'Terraform workspace to use'
+        required: false
+        type: string
+        default: 'default'
     secrets:
-      AWS_ACCESS_KEY_ID:
+      AWS_ACCESS_KEY:
         required: true
-      AWS_SECRET_ACCESS_KEY:
+      AWS_SECRET_KEY:
         required: true
-      AWS_SESSION_TOKEN:
-        required: false
-
-      TF_VARS_JSON:
-        description: 'JSON string: {"project":"value", "domain":"value", ...}'
-        required: false
-      TF_BACKEND_JSON:
-        description: 'JSON string: {"region":"value", "bucket":"value", ...}'
-        required: false
+      AWS_REGION:
+        required: true
+      
 
 jobs:
   terraform:
-    runs-on: ubuntu-24.04
-   
+    name: 'Terraform Job'
+    runs-on: ubuntu-latest
+    
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      TF_DIR: ${{ inputs.terraform_dir }}
+      TF_COMMAND: ${{ inputs.terraform_command }}
+      TF_WORKSPACE: ${{ inputs.workspace }}
+      
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.terraform_dir }}
+        
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      
+    - name: Set up Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+        
+    - name: Create backend_aws.hcl
+      run: |
+        cat > backend_aws.hcl << EOF
+        bucket  = "${{ inputs.backend_bucket }}"
+        key     = "${{ inputs.backend_key }}"
+        region  = "${{ inputs.backend_region }}"
+        encrypt = true
+        EOF
 
-      - name: Discover TF_VARS_JSON
-        env:
-          TF_VARS_RAW: ${{ secrets.TF_VARS_JSON }}
-        run: |
-          echo "Parsing TF_VARS_JSON..."
-          mkdir -p .env
-          if [ -n "$TF_VARS_RAW" ]; then
-            echo "$TF_VARS_RAW" | jq -r 'to_entries | .[] | 
-              if (.key | startswith("TF_VAR_")) then 
-                "\(.key)=\(.value)" 
-              else 
-                "TF_VAR_\(.key)=\(.value)" 
-              end' > .env/tf_vars
-          else
-            echo "No TF_VARS_JSON provided, skipping..."
-          fi
+    - name: Create backend configuration
+      run: |
+        cat << EOF > backend.tf
+        terraform {
+          backend "s3" {}
+        }
+        EOF
+      
+    - name: Terraform Init
+      run: terraform init -reconfigure -backend-config=backend_aws.hcl -input=false
+    
+    - name: Setup Terraform Workspace
+      run: |
+        WORKSPACES=$(terraform workspace list)
+        echo "Available workspaces:"
+        echo "$WORKSPACES"
+        
+        if echo "$WORKSPACES" | grep -q "$TF_WORKSPACE"; then
+          echo "Workspace $TF_WORKSPACE exists. Selecting it..."
+          terraform workspace select "$TF_WORKSPACE"
+        else
+          echo "Workspace $TF_WORKSPACE does not exist. Creating it..."
+          terraform workspace new "$TF_WORKSPACE"
+        fi
+        
+        echo "Current workspace: $(terraform workspace show)"
+      
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+      continue-on-error: true
+      
+    - name: Terraform Validate
+      run: terraform validate
 
-      - name: Discover TF_BACKEND_JSON
-        env:
-          TF_BACKEND_RAW: ${{ secrets.TF_BACKEND_JSON }}
-        run: |
-          echo "Parsing TF_BACKEND_JSON..."
-          if [ -n "$TF_BACKEND_RAW" ]; then
-            echo "$TF_BACKEND_RAW" | jq -r 'to_entries | .[] | 
-              if (.key | startswith("BACKEND_")) then 
-                "\(.key)=\(.value)" 
-              else 
-                "BACKEND_\(.key)=\(.value)" 
-              end' > .env/backend_vars
-          else
-            echo "No TF_BACKEND_JSON provided, skipping..."
-          fi
-
-      - name: Invoke Terraform
-        run: |
-          tf_vars=()
-          if [ -f .env/tf_vars ]; then
-            while IFS='=' read -r key value; do
-              tf_vars+=("-e $key=$value")
-            done < .env/tf_vars
-          fi
-
-          backend_vars=()
-          if [ -f .env/backend_vars ]; then
-            while IFS='=' read -r key value; do
-              backend_vars+=("-e $key=$value")
-            done < .env/backend_vars
-          fi
-
-          docker run \
-            -v $(pwd):/app \
-            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-            ${AWS_SESSION_TOKEN:+-e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}} \
-            -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
-            -e ACTION_TERRAFORM_CMD=${{ inputs.terraform_command }} \
-            -e ACTION_TERRAFORM_WORKSPACE=${{ inputs.terraform_workspace }} \
-            ${tf_vars[@]} \
-            ${backend_vars[@]} \
-            madpixels/action-terraform:${{ inputs.actions_verions }}_tf${{ inputs.terraform_version }}
-            rm -rf .env
+    - name: Terraform Plan
+      if: ${{ inputs.terraform_command == 'plan' }}
+      run: terraform plan -input=false -no-color
+      id: plan
+      
+    - name: Terraform Apply
+      if: ${{ inputs.terraform_command == 'apply' }}
+      run: terraform apply -auto-approve -input=false -no-color
+      id: apply
+      
+    - name: Output Results
+      run: |
+        if [[ "$TF_COMMAND" == "plan" ]]; then
+          echo "::group::Terraform Plan Output"
+          echo "${{ steps.plan.outputs.stdout }}"
+          echo "::endgroup::"
+        elif [[ "$TF_COMMAND" == "apply" ]]; then
+          echo "::group::Terraform Apply Output"
+          echo "${{ steps.apply.outputs.stdout }}"
+          echo "::endgroup::"
+        fi
