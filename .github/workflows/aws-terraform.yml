@@ -1,146 +1,114 @@
-name: Reusable Terraform Workflow
+name: Terraform
 
 on:
   workflow_call:
     inputs:
-      terraform_version:
-        description: 'Terraform version to use'
-        required: false
-        type: string
-        default: '1.6.1'
-      terraform_dir:
-        description: 'Directory containing Terraform configuration'
+      aws_access_key_id:
+        description: AWS access key ID
         required: true
         type: string
-      terraform_command:
-        description: 'Terraform command to run (plan or apply)'
+      aws_secret_access_key:
+        description: AWS secret access key
+        required: true
+        type: string
+      aws_region:
+        description: AWS region
+        required: true
+        type: string
+      tf_dir:
+        description: Path to your Terraform directory
+        required: true
+        type: string
+      backend_bucket:
+        description: S3 bucket for remote state
+        required: true
+        type: string
+      backend_key:
+        description: S3 key for this workspace’s state file
+        required: true
+        type: string
+      backend_region:
+        description: Region of the S3 backend bucket
         required: true
         type: string
       workspace:
-        description: 'Terraform workspace to use'
+        description: Terraform workspace to select/create
         required: false
+        default: default
         type: string
-        default: 'default'
-      backend_config_json:
-        description: 'JSON  (bucket, key, region, encrypt)'
+      command:
+        description: 'Either "plan" or "apply"'
         required: true
         type: string
-      tf_vars_json:
-        description: 'JSON TF_VAR_*'
+        
+      tf_vars:
+        description: Extra `-var` or `-var-file` flags
         required: false
+        default: ''
         type: string
-        default: '{}'
+
     secrets:
-      AWS_ACCESS_KEY:
-        required: true
-      AWS_SECRET_KEY:
-        required: true
-      AWS_REGION:
-        required: true
+      aws_access_key_id:
+        required: false
+      aws_secret_access_key:
+        required: false
 
 jobs:
   terraform:
-    name: 'Terraform Job'
     runs-on: ubuntu-latest
-    
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      TF_DIR: ${{ inputs.terraform_dir }}
-      TF_COMMAND: ${{ inputs.terraform_command }}
-      TF_WORKSPACE: ${{ inputs.workspace }}
-      TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-      
     defaults:
       run:
         shell: bash
-        working-directory: ${{ inputs.terraform_dir }}
-        
+        working-directory: ${{ inputs.tf_dir }}
+    env:
+      AWS_ACCESS_KEY_ID:      ${{ inputs.aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY:  ${{ inputs.aws_secret_access_key }}
+      AWS_REGION:             ${{ inputs.aws_region }}
+
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-      
-    - name: Set up Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: ${{ inputs.terraform_version }}
-    
-    - name: Parse Backend Configuration
-      run: |
-        BACKEND_CONFIG='${{ inputs.backend_config_json }}'
-        echo "Creating backend_aws.hcl with the following configuration:"
-        echo "$BACKEND_CONFIG" | jq .
-        
-        echo "$BACKEND_CONFIG" | jq -r 'to_entries | .[] | "\(.key) = \"\(.value)\""' > backend_aws.hcl
-        
-        echo "backend_aws.hcl содержимое:"
-        cat backend_aws.hcl
-        
-    - name: Parse Terraform Variables
-      run: |
-        TF_VARS='${{ inputs.tf_vars_json }}'
-        echo "Setting Terraform variables from JSON:"
-        
-        if [ "$TF_VARS" != "{}" ] && [ "$TF_VARS" != "" ]; then
-          echo "$TF_VARS" | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
-          echo "$TF_VARS" | jq -r 'to_entries | .[] | "Setting TF_VAR_\(.key)=\(.value)"'
-        else
-          echo "No additional Terraform variables provided"
-        fi
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Create backend configuration
-      run: |
-        cat << EOF > backend.tf
-        terraform {
-          backend "s3" {}
-        }
-        EOF
-      
-    - name: Terraform Init
-      run: terraform init -reconfigure -backend-config=backend_aws.hcl -input=false
-    
-    - name: Setup Terraform Workspace
-      run: |
-        WORKSPACES=$(terraform workspace list)
-        echo "Available workspaces:"
-        echo "$WORKSPACES"
-        
-        if echo "$WORKSPACES" | grep -q "$TF_WORKSPACE"; then
-          echo "Workspace $TF_WORKSPACE exists. Selecting it..."
-          terraform workspace select "$TF_WORKSPACE"
-        else
-          echo "Workspace $TF_WORKSPACE does not exist. Creating it..."
-          terraform workspace new "$TF_WORKSPACE"
-        fi
-        
-        echo "Current workspace: $(terraform workspace show)"
-      
-    - name: Terraform Format Check
-      run: terraform fmt -check -recursive
-      continue-on-error: true
-      
-    - name: Terraform Validate
-      run: terraform validate
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id:     ${{ inputs.aws_access_key_id }}
+          aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+          aws-region:            ${{ inputs.aws_region }}
 
-    - name: Terraform Plan
-      if: ${{ inputs.terraform_command == 'plan' }}
-      run: terraform plan -input=false -no-color
-      id: plan
-      
-    - name: Terraform Apply
-      if: ${{ inputs.terraform_command == 'apply' }}
-      run: terraform apply -auto-approve -input=false -no-color
-      id: apply
-      
-    - name: Output Results
-      run: |
-        if [[ "$TF_COMMAND" == "plan" ]]; then
-          echo "::group::Terraform Plan Output"
-          echo "${{ steps.plan.outputs.stdout }}"
-          echo "::endgroup::"
-        elif [[ "$TF_COMMAND" == "apply" ]]; then
-          echo "::group::Terraform Apply Output"
-          echo "${{ steps.apply.outputs.stdout }}"
-          echo "::endgroup::"
-        fi
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.1
+
+      - name: Create backend_aws.hcl
+        run: |
+          cat > backend_aws.hcl <<EOF
+          bucket  = "${{ inputs.backend_bucket }}"
+          key     = "${{ inputs.backend_key }}"
+          region  = "${{ inputs.backend_region }}"
+          encrypt = true
+          EOF
+
+      - name: Terraform Init
+        run: terraform init -input=false -reconfigure -backend-config=backend_aws.hcl
+
+      - name: Select or create workspace
+        run: |
+          # try to select, or create if missing
+          terraform workspace select "${{ inputs.workspace }}" \
+            || terraform workspace new "${{ inputs.workspace }}"
+
+      - name: Terraform fmt & validate
+        run: |
+          terraform fmt -check
+          terraform validate
+
+      - name: Terraform ${{ inputs.command }}
+        id: tfcmd
+        run: |
+          if [ "${{ inputs.command }}" = "apply" ]; then
+            terraform apply -input=false -auto-approve ${{ inputs.tf_vars }}
+          else
+            terraform plan  -input=false              ${{ inputs.tf_vars }}
+          fi
