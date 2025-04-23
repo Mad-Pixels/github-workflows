@@ -1,4 +1,4 @@
-name: AWS Terraform
+name: Reusable Terraform Workflow
 
 on:
   workflow_call:
@@ -16,23 +16,20 @@ on:
         description: 'Terraform command to run (plan or apply)'
         required: true
         type: string
-      backend_bucket:
-        description: 'S3 bucket for Terraform state'
-        required: true
-        type: string
-      backend_key:
-        description: 'S3 key for Terraform state'
-        required: true
-        type: string
-      backend_region:
-        description: 'AWS region for S3 backend'
-        required: true
-        type: string
       workspace:
         description: 'Terraform workspace to use'
         required: false
         type: string
         default: 'default'
+      backend_config_json:
+        description: 'JSON  (bucket, key, region, encrypt)'
+        required: true
+        type: string
+      tf_vars_json:
+        description: 'JSON TF_VAR_*'
+        required: false
+        type: string
+        default: '{}'
     secrets:
       AWS_ACCESS_KEY:
         required: true
@@ -40,7 +37,6 @@ on:
         required: true
       AWS_REGION:
         required: true
-      
 
 jobs:
   terraform:
@@ -54,6 +50,7 @@ jobs:
       TF_DIR: ${{ inputs.terraform_dir }}
       TF_COMMAND: ${{ inputs.terraform_command }}
       TF_WORKSPACE: ${{ inputs.workspace }}
+      TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
       
     defaults:
       run:
@@ -68,15 +65,29 @@ jobs:
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: ${{ inputs.terraform_version }}
-        
-    - name: Create backend_aws.hcl
+    
+    - name: Parse Backend Configuration
       run: |
-        cat > backend_aws.hcl << EOF
-        bucket  = "${{ inputs.backend_bucket }}"
-        key     = "${{ inputs.backend_key }}"
-        region  = "${{ inputs.backend_region }}"
-        encrypt = true
-        EOF
+        BACKEND_CONFIG='${{ inputs.backend_config_json }}'
+        echo "Creating backend_aws.hcl with the following configuration:"
+        echo "$BACKEND_CONFIG" | jq .
+        
+        echo "$BACKEND_CONFIG" | jq -r 'to_entries | .[] | "\(.key) = \"\(.value)\""' > backend_aws.hcl
+        
+        echo "backend_aws.hcl содержимое:"
+        cat backend_aws.hcl
+        
+    - name: Parse Terraform Variables
+      run: |
+        TF_VARS='${{ inputs.tf_vars_json }}'
+        echo "Setting Terraform variables from JSON:"
+        
+        if [ "$TF_VARS" != "{}" ] && [ "$TF_VARS" != "" ]; then
+          echo "$TF_VARS" | jq -r 'to_entries | .[] | "TF_VAR_\(.key)=\(.value)"' >> $GITHUB_ENV
+          echo "$TF_VARS" | jq -r 'to_entries | .[] | "Setting TF_VAR_\(.key)=\(.value)"'
+        else
+          echo "No additional Terraform variables provided"
+        fi
 
     - name: Create backend configuration
       run: |
