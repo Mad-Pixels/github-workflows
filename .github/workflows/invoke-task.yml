@@ -1,4 +1,4 @@
-name: GolangCI Lint Check
+name: Task Runner
 
 on:
   workflow_call:
@@ -11,13 +11,12 @@ on:
         type: string
         required: false
         default: "1.24"
-      golangci_lint_version:
+      command:
         type: string
-        required: false
-        default: "v2.1.2"
+        required: true
 
 jobs:
-  lint:
+  task:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -33,10 +32,9 @@ jobs:
         with:
           go-version: ${{ inputs.go_version }}
 
-      - name: Install golangci-lint
+      - name: Install Task
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
-            | sh -s -- -b /usr/local/bin ${{ inputs.golangci_lint_version }}
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
 
-      - name: Run golangci-lint
-        run: golangci-lint run --timeout=5m
+      - name: Invoke ${{ inputs.command }}
+        run: task ${{ inputs.command }}
