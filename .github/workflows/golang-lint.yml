@@ -1,0 +1,42 @@
+name: GolangCI Lint Check
+
+on:
+  workflow_call:
+    inputs:
+      go_dir:
+        type: string
+        required: false
+        default: "./"
+      go_version:
+        type: string
+        required: false
+        default: "1.24"
+      golangci_lint_version:
+        type: string
+        required: false
+        default: "v1.55.2"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.go_dir }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ inputs.go_version }}
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+            | sh -s -- -b /usr/local/bin ${{ inputs.golangci_lint_version }}
+
+      - name: Run golangci-lint
+        run: golangci-lint run --timeout=5m
