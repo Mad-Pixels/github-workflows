@@ -16,9 +16,9 @@ inputs:
     description: 'Path to Terraform config'
     required: true
   tf_workspace:
-    description: 'Terraform workspace'
+    description: 'Terraform workspace (leave empty to use default)'
     required: false
-    default: default
+    default: ""
   tf_command:
     description: 'Terraform command: [plan, apply]'
     required: true
@@ -91,6 +91,7 @@ runs:
       run: terraform init -input=false -reconfigure -backend-config=backend_aws.hcl
 
     - name: Select or create workspace
+      if: inputs.tf_workspace != ''
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
