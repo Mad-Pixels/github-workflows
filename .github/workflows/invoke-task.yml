@@ -14,6 +14,9 @@ on:
       command:
         type: string
         required: true
+      vars:
+        type: string
+        required: false
 
 jobs:
   task:
@@ -36,10 +39,12 @@ jobs:
         run: |
           sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
 
-      - name: Create buildx builder (required for ARM64)
+      - name: Export VARS as env
+        if: ${{ inputs.vars != '' }}
         run: |
-          docker buildx create --name applingo-builder --driver docker-container --use || true
-          docker buildx inspect --bootstrap
+          echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
+            echo "$key=$value" >> $GITHUB_ENV
+          done
 
-      - name: Invoke ${{ inputs.command }}
+      - name: Run Task
         run: task ${{ inputs.command }}
