@@ -1,0 +1,48 @@
+name: Task Runner
+
+description: Run Taskfile command with optional Go setup and environment variables
+
+inputs:
+  go_dir:
+    description: "Working directory for Go project"
+    required: false
+    default: "./"
+  go_version:
+    description: "Go version"
+    required: false
+    default: "1.24"
+  command:
+    description: "Task command to run"
+    required: true
+  vars:
+    description: "Optional environment variables in format key:value,key:value"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ inputs.go_version }}
+
+    - name: Install Task
+      shell: bash
+      run: |
+        sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+
+    - name: Export VARS as env
+      if: ${{ inputs.vars != '' }}
+      shell: bash
+      run: |
+        echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
+          echo "$key=$value" >> $GITHUB_ENV
+        done
+
+    - name: Run Task
+      shell: bash
+      working-directory: ${{ inputs.go_dir }}
+      run: task ${{ inputs.command }}
