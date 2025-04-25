@@ -1,0 +1,54 @@
+name: Lambda Restart
+
+description: Update AWS Lambda function with latest container image from ECR
+
+inputs:
+  aws_access_key_id:
+    description: 'AWS access key ID'
+    required: true
+  aws_secret_access_key:
+    description: 'AWS secret access key'
+    required: true
+  aws_region:
+    description: 'AWS region'
+    required: true
+  aws_account_id:
+    description: 'AWS account ID'
+    required: true
+
+  function:
+    description: 'Lambda function name (suffix only, e.g. api-schema)'
+    required: true
+  repository:
+    description: 'ECR repository name'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Update Lambda function code from ECR
+      shell: bash
+      run: |
+        IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.function }}"
+        FUNCTION_NAME="applingo-${{ inputs.function }}"
+
+        echo "Updating Lambda function $FUNCTION_NAME with image: $IMAGE_URI"
+
+        aws lambda update-function-code \
+          --function-name "$FUNCTION_NAME" \
+          --image-uri "$IMAGE_URI" \
+          --region "${{ inputs.aws_region }}" \
+          --no-cli-pager
+
+        aws lambda wait function-updated \
+          --function-name "$FUNCTION_NAME" \
+          --region "${{ inputs.aws_region }}"
+
+        echo "Lambda function $FUNCTION_NAME has been updated successfully."
