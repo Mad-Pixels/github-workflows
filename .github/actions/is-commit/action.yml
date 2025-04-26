@@ -12,8 +12,10 @@ inputs:
 outputs:
   proceed:
     description: "'true' if this is a normal commit, 'false' if it's a PR merge/squash"
+    value: ${{ steps.prcheck.outputs.proceed }}
   pr_numbers:
     description: "List of PR numbers associated with this commit (if any)"
+    value: ${{ steps.prcheck.outputs.pr_numbers }}
 
 runs:
   using: composite
@@ -60,9 +62,9 @@ runs:
             echo "Found $pr_count merged PR(s) associated with this commit → skip"
             pr_numbers=$(echo "$search_result" | jq -r '.items[].number')
             echo "PR Numbers: $pr_numbers"
-            # Явно устанавливаем output для GitHub Actions
-            echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
-            echo "proceed=false" >> $GITHUB_OUTPUT
+            # Используем современный способ установки output для GitHub Actions
+            echo "pr_numbers=$pr_numbers" >> "$GITHUB_OUTPUT"
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
         fi
@@ -73,14 +75,14 @@ runs:
           echo "Found $count PR(s) — this is a merge/squash → skip"
           pr_numbers=$(echo "$response" | jq -r '.[].number')
           echo "PR Numbers: $pr_numbers"
-          # Явно устанавливаем output для GitHub Actions
-          echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
-          echo "proceed=false" >> $GITHUB_OUTPUT
+          # Используем современный способ установки output для GitHub Actions
+          echo "pr_numbers=$pr_numbers" >> "$GITHUB_OUTPUT"
+          echo "proceed=false" >> "$GITHUB_OUTPUT"
         else
           echo "No PR associated → normal commit"
-          # Явно устанавливаем output для GitHub Actions
-          echo "proceed=true" >> $GITHUB_OUTPUT
-          echo "pr_numbers=" >> $GITHUB_OUTPUT
+          # Используем современный способ установки output для GitHub Actions
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+          echo "pr_numbers=" >> "$GITHUB_OUTPUT"
           # Выводим и на экран для отладки
-          echo "Set proceed=true"
+          echo "Set proceed=true in output"
         fi
