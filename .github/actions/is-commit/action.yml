@@ -1,0 +1,62 @@
+name: Is Commit
+
+description: |
+  Determines if the event is a regular commit or a merge/squash commit.
+  Outputs `proceed=true` if it is a regular commit, `proceed=false` otherwise.
+
+inputs:
+  github_token:
+    description: "GitHub token to access API"
+    required: true
+
+outputs:
+  proceed:
+    description: "true if this is a regular commit, false if it is a merge or squash commit"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Gather commit context
+      id: vars
+      shell: bash
+      run: |
+        echo "ACTOR=${{ github.actor }}" >> $GITHUB_ENV
+        echo "MSG='${{ github.event.head_commit.message }}'" >> $GITHUB_ENV
+        echo "SHA=${{ github.event.head_commit.id }}" >> $GITHUB_ENV
+
+    - name: Initial actor and message check
+      id: check
+      shell: bash
+      run: |
+        echo "Commit actor: $ACTOR"
+        echo "Commit message: $MSG"
+        if [[ "$ACTOR" == "web-flow" ]]; then
+          echo "proceed=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        if echo "$MSG" | grep -Eiq "merge pull request"; then
+          echo "proceed=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        if echo "$MSG" | grep -Eiq "\(#[0-9]+\)"; then
+          echo "proceed=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        echo "proceed=maybe" >> $GITHUB_OUTPUT
+
+    - name: Check pull request association via GitHub API
+      if: steps.check.outputs.proceed == 'maybe'
+      id: prcheck
+      shell: bash
+      run: |
+        prs=$(curl -s \
+          -H "Accept: application/vnd.github.groot-preview+json" \
+          -H "Authorization: Bearer ${{ inputs.github_token }}" \
+          https://api.github.com/repos/${{ github.repository }}/commits/${{ env.SHA }}/pulls)
+
+        count=$(echo "$prs" | jq 'length')
+        if [ "$count" -gt 0 ]; then
+          echo "proceed=false" >> $GITHUB_OUTPUT
+        else
+          echo "proceed=true" >> $GITHUB_OUTPUT
+        fi
