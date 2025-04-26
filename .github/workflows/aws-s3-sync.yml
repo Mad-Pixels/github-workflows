@@ -11,9 +11,9 @@ on:
         required: false
         default: ""
     secrets:
-      aws_access_key_id:
+      aws_access_key:
         required: true
-      aws_secret_access_key:
+      aws_secret_key:
         required: true
       aws_region:
         required: true
@@ -34,8 +34,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.aws_access_key_id }}
-          aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
+          aws-access-key-id: ${{ secrets.aws_access_key }}
+          aws-secret-access-key: ${{ secrets.aws_secret_key }}
           aws-region: ${{ secrets.aws_region }}
 
       - name: Sync directory to S3
