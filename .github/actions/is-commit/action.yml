@@ -21,7 +21,7 @@ runs:
       shell: bash
       run: |
         echo "ACTOR=${{ github.actor }}" >> $GITHUB_ENV
-        echo "MSG='${{ github.event.head_commit.message }}'" >> $GITHUB_ENV
+        echo "MSG=${{ github.event.head_commit.message }}" >> $GITHUB_ENV
         echo "SHA=${{ github.event.head_commit.id }}" >> $GITHUB_ENV
 
     - name: Initial actor and message check
