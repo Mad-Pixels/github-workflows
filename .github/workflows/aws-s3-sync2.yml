@@ -1,0 +1,60 @@
+name: AWS Terraform
+
+on:
+  workflow_call:
+    inputs:
+      artifacts:
+        required: true
+        type: string
+        description: "Artifacts name"
+      actions_verions:
+        required: true
+        type: string
+        description: "Ci-action image version (0.0.1)"
+      exclude:
+        required: false
+        type: string
+        default: ""
+        description: "Exclude files: '*.tmp,*.log'" 
+      working_directory:
+        required: false
+        type: string
+        default: "terraform"
+        description: "Terraform source directory"
+   
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+      AWS_SESSION_TOKEN:
+        required: false
+
+      BUCKET_DESTINATION:
+        required: true
+        description: "{ backet_name }/{ path }" 
+
+jobs:
+  terraform:
+    runs-on: ubuntu-24.04
+   
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifacts }}
+          path: dist_files
+
+      - name: Invoke Cli
+        run: |
+          docker run \
+            -v $(pwd):/app \
+            -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            ${AWS_SESSION_TOKEN:+-e AWS_SESSION_TOKEN=${{ secrets.AWS_SESSION_TOKEN }}} \
+            -e ACTION_WORKING_DIR=/app/${{ inputs.working_directory }} \
+            -e ACTION_AWS_CMD=s3_sync \
+            -e ACTION_AWS_S3_DESTINATION=s3://${{ secrets.BUCKET_DESTINATION }} \
+            -e ACTION_AWS_S3_DELETE=true \
+            -e ACTION_AWS_S3_EXCLUDE=${{ inputs.exclude }} \
+            madpixels/action-aws:${{ inputs.actions_verions }}_aws2.22.26
