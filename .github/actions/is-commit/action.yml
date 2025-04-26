@@ -1,8 +1,8 @@
 name: Is Commit
-
 description: |
-  Determines if the event is a regular push commit (not a PR merge).
-  Outputs `proceed=true` if it’s a normal commit, `proceed=false` otherwise.
+  Determines whether a push is a plain commit (proceed=true) 
+  or part of a PR merge/squash (proceed=false), *solely* by querying 
+  the GitHub API for pull‐requests touching that SHA.
 
 inputs:
   github_token:
@@ -11,46 +11,29 @@ inputs:
 
 outputs:
   proceed:
-    description: "‘true’ if this is a normal commit, ‘false’ if it’s a merge‐pull request."
+    description: "‘true’ if this is a normal commit, ‘false’ if it’s a PR merge/squash"
 
 runs:
   using: composite
   steps:
-    - name: Initial actor & merge‐check
-      id: check
-      shell: bash
-      run: |
-        ACTOR="${{ github.actor }}"
-        MSG="${{ github.event.head_commit.message }}"
-        echo "Commit actor: $ACTOR"
-        echo "Commit message: $MSG"
-        # UI-merge/squash always actor=web-flow
-        if [[ "$ACTOR" == "web-flow" ]]; then
-          echo "proceed=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        # classic "Merge pull request #123…"
-        if echo "$MSG" | grep -Eiq "^Merge pull request"; then
-          echo "proceed=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        # остальные — пока не ясно, проверим через API
-        echo "proceed=maybe" >> $GITHUB_OUTPUT
-
-    - name: Check PR association via GitHub API
-      if: steps.check.outputs.proceed == 'maybe'
+    - name: Check pull request association via GitHub API
       id: prcheck
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        SHA:         ${{ github.event.head_commit.id }}
+        REPO:        ${{ github.repository }}
       run: |
-        SHA="${{ github.event.head_commit.id }}"
-        # узнаём, есть ли у этого SHA открытые PR
+        echo "Checking commit $SHA in repo $REPO…"
         prs=$(curl -s \
           -H "Accept: application/vnd.github.groot-preview+json" \
-          -H "Authorization: Bearer ${{ inputs.github_token }}" \
-          https://api.github.com/repos/${{ github.repository }}/commits/$SHA/pulls)
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          "https://api.github.com/repos/$REPO/commits/$SHA/pulls")
         count=$(echo "$prs" | jq 'length')
         if [ "$count" -gt 0 ]; then
+          echo "Found $count PR(s) — this is a merge/squash → skip"
           echo "proceed=false" >> $GITHUB_OUTPUT
         else
+          echo "No PR associated → normal commit"
           echo "proceed=true"  >> $GITHUB_OUTPUT
         fi
