@@ -36,12 +36,15 @@ runs:
         
         # Debug info
         echo "API Response:"
-        echo "$response" | jq '.'
+        echo "$response" | jq 2>/dev/null || echo "Failed to parse JSON response"
         
-        # Check if response is an error
-        error=$(echo "$response" | jq -r '.message // empty')
-        if [ ! -z "$error" ]; then
-          echo "::warning::API Error: $error"
+        # Проверяем, является ли ответ массивом или объектом с сообщением об ошибке
+        is_array=$(echo "$response" | jq 'if type=="array" then true else false end')
+        if [ "$is_array" = "false" ]; then
+          # Если это не массив, проверяем наличие сообщения об ошибке
+          error=$(echo "$response" | jq -r '.message // empty')
+          echo "::warning::API Response is not an array. Possible error: $error"
+          
           # Fallback to search API for merged PRs
           echo "Trying alternative method to detect PR association..."
           
@@ -71,6 +74,7 @@ runs:
           echo "PR Numbers: $pr_numbers"
           echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
           echo "proceed=false" >> $GITHUB_OUTPUT
+          exit 0
         else
           echo "No PR associated → normal commit"
           echo "proceed=true" >> $GITHUB_OUTPUT
