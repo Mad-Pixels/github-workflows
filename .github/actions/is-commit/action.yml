@@ -60,6 +60,7 @@ runs:
             echo "Found $pr_count merged PR(s) associated with this commit → skip"
             pr_numbers=$(echo "$search_result" | jq -r '.items[].number')
             echo "PR Numbers: $pr_numbers"
+            # Явно устанавливаем output для GitHub Actions
             echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
             echo "proceed=false" >> $GITHUB_OUTPUT
             exit 0
@@ -72,11 +73,14 @@ runs:
           echo "Found $count PR(s) — this is a merge/squash → skip"
           pr_numbers=$(echo "$response" | jq -r '.[].number')
           echo "PR Numbers: $pr_numbers"
+          # Явно устанавливаем output для GitHub Actions
           echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
           echo "proceed=false" >> $GITHUB_OUTPUT
-          exit 0
         else
           echo "No PR associated → normal commit"
+          # Явно устанавливаем output для GitHub Actions
           echo "proceed=true" >> $GITHUB_OUTPUT
           echo "pr_numbers=" >> $GITHUB_OUTPUT
+          # Выводим и на экран для отладки
+          echo "Set proceed=true"
         fi
