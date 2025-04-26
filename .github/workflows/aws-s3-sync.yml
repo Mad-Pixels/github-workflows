@@ -6,9 +6,6 @@ on:
       source_dir:
         type: string
         required: true
-      bucket_name:
-        type: string
-        required: true
       bucket_prefix:
         type: string
         required: false
@@ -19,6 +16,8 @@ on:
       aws_secret_access_key:
         required: true
       aws_region:
+        required: true
+      bucket_name:
         required: true
 
 jobs:
@@ -41,5 +40,5 @@ jobs:
 
       - name: Sync directory to S3
         run: |
-          DEST="s3://${{ inputs.bucket_name }}/${{ inputs.bucket_prefix }}"
+          DEST="s3://${{ secrets.bucket_name }}/${{ inputs.bucket_prefix }}"
           aws s3 sync "${{ inputs.source_dir }}" "$DEST" --delete
