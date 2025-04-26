@@ -1,6 +1,7 @@
 name: Is Commit
+
 description: |
-  Determines if the event is a regular push commit (not a PR merge/squash).
+  Determines if the event is a regular push commit (not a PR merge).
   Outputs `proceed=true` if it’s a normal commit, `proceed=false` otherwise.
 
 inputs:
@@ -10,12 +11,12 @@ inputs:
 
 outputs:
   proceed:
-    description: "‘true’ if this is a normal commit, ‘false’ if merge/squash commit"
+    description: "‘true’ if this is a normal commit, ‘false’ if it’s a merge‐pull request."
 
 runs:
   using: composite
   steps:
-    - name: Initial actor & message check
+    - name: Initial actor & merge‐check
       id: check
       shell: bash
       run: |
@@ -23,22 +24,17 @@ runs:
         MSG="${{ github.event.head_commit.message }}"
         echo "Commit actor: $ACTOR"
         echo "Commit message: $MSG"
-        # if GitHub UI merge/squash (actor=web-flow) → skip
+        # UI-merge/squash always actor=web-flow
         if [[ "$ACTOR" == "web-flow" ]]; then
           echo "proceed=false" >> $GITHUB_OUTPUT
           exit 0
         fi
-        # classic merge-commit
-        if echo "$MSG" | grep -Eiq "merge pull request"; then
+        # classic "Merge pull request #123…"
+        if echo "$MSG" | grep -Eiq "^Merge pull request"; then
           echo "proceed=false" >> $GITHUB_OUTPUT
           exit 0
         fi
-        # CLI squash (contains “(#123)” pattern)
-        if echo "$MSG" | grep -Eiq "\(#[0-9]+\)"; then
-          echo "proceed=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        # otherwise maybe a plain commit
+        # остальные — пока не ясно, проверим через API
         echo "proceed=maybe" >> $GITHUB_OUTPUT
 
     - name: Check PR association via GitHub API
@@ -47,7 +43,7 @@ runs:
       shell: bash
       run: |
         SHA="${{ github.event.head_commit.id }}"
-        # Query the GH API for PRs touching this SHA
+        # узнаём, есть ли у этого SHA открытые PR
         prs=$(curl -s \
           -H "Accept: application/vnd.github.groot-preview+json" \
           -H "Authorization: Bearer ${{ inputs.github_token }}" \
