@@ -60,11 +60,12 @@ runs:
           
           if [ "$pr_count" -gt 0 ]; then
             echo "Found $pr_count merged PR(s) associated with this commit → skip"
-            pr_numbers=$(echo "$search_result" | jq -r '.items[].number')
+            pr_numbers=$(echo "$search_result" | jq -r '.items[].number' | tr '\n' ',')
+            pr_numbers=${pr_numbers%,}  # Remove trailing comma
             echo "PR Numbers: $pr_numbers"
-            # Используем современный способ установки output для GitHub Actions
-            echo "pr_numbers=$pr_numbers" >> "$GITHUB_OUTPUT"
-            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            # Используем переменную GITHUB_OUTPUT для установки выходных данных
+            echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
+            echo "proceed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
         fi
@@ -73,16 +74,17 @@ runs:
         count=$(echo "$response" | jq 'length')
         if [ "$count" -gt 0 ]; then
           echo "Found $count PR(s) — this is a merge/squash → skip"
-          pr_numbers=$(echo "$response" | jq -r '.[].number')
+          pr_numbers=$(echo "$response" | jq -r '.[].number' | tr '\n' ',')
+          pr_numbers=${pr_numbers%,}  # Remove trailing comma
           echo "PR Numbers: $pr_numbers"
-          # Используем современный способ установки output для GitHub Actions
-          echo "pr_numbers=$pr_numbers" >> "$GITHUB_OUTPUT"
-          echo "proceed=false" >> "$GITHUB_OUTPUT"
+          # Используем переменную GITHUB_OUTPUT для установки выходных данных
+          echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
+          echo "proceed=false" >> $GITHUB_OUTPUT
         else
           echo "No PR associated → normal commit"
-          # Используем современный способ установки output для GitHub Actions
-          echo "proceed=true" >> "$GITHUB_OUTPUT"
-          echo "pr_numbers=" >> "$GITHUB_OUTPUT"
+          # Используем переменную GITHUB_OUTPUT для установки выходных данных
+          echo "proceed=true" >> $GITHUB_OUTPUT
+          echo "pr_numbers=" >> $GITHUB_OUTPUT
           # Выводим и на экран для отладки
           echo "Set proceed=true in output"
         fi
