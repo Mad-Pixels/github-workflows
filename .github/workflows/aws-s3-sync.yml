@@ -41,4 +41,9 @@ jobs:
       - name: Sync directory to S3
         run: |
           DEST="s3://${{ secrets.bucket_name }}/${{ inputs.bucket_prefix }}"
-          aws s3 sync "${{ inputs.source_dir }}" "$DEST" --delete
+          aws s3 sync "${{ inputs.source_dir }}" "$DEST" \
+            --delete \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude ".gitignore" \
+            --exclude ".gitattributes"
