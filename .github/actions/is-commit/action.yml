@@ -73,18 +73,21 @@ runs:
         # Process normal response
         count=$(echo "$response" | jq 'length')
         if [ "$count" -gt 0 ]; then
-          echo "Found $count PR(s) — this is a merge/squash → skip"
-          pr_numbers=$(echo "$response" | jq -r '.[].number' | tr '\n' ',')
-          pr_numbers=${pr_numbers%,}  # Remove trailing comma
-          echo "PR Numbers: $pr_numbers"
-          # Используем переменную GITHUB_OUTPUT для установки выходных данных
-          echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
-          echo "proceed=false" >> $GITHUB_OUTPUT
+          merged_count=$(echo "$response" | jq '[.[] | select(.merged_at != null)] | length')
+  
+          if [ "$merged_count" -gt 0 ]; then
+            echo "Found $merged_count merged PR(s) — this is a merge/squash → skip"
+            pr_numbers=$(echo "$response" | jq -r '[.[] | select(.merged_at != null) | .number] | join(",")')
+            echo "PR Numbers: $pr_numbers"
+            echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
+            echo "proceed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Only open/unmerged PRs found — normal commit"
+            echo "proceed=true" >> $GITHUB_OUTPUT
+            echo "pr_numbers=" >> $GITHUB_OUTPUT
+          fi
         else
           echo "No PR associated → normal commit"
-          # Используем переменную GITHUB_OUTPUT для установки выходных данных
           echo "proceed=true" >> $GITHUB_OUTPUT
           echo "pr_numbers=" >> $GITHUB_OUTPUT
-          # Выводим и на экран для отладки
-          echo "Set proceed=true in output"
         fi
