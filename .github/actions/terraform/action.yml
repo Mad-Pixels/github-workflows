@@ -115,6 +115,9 @@ runs:
           apply)
             terraform apply -input=false -auto-approve ${{ inputs.tf_vars }}
             ;;
+          destroy)
+            terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }}
+            ;;
           *)
             echo "Unknown command: ${{ inputs.tf_command }}" >&2
             exit 1
