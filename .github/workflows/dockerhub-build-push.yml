@@ -32,9 +32,9 @@ on:
           The build context path for Docker (a directory containing the Dockerfile).
         default: "."
     secrets:
-      USERNAME:
+      docker_user:
         required: true
-      TOKEN:
+      docker_token:
         required: true
 
 jobs:
@@ -50,8 +50,8 @@ jobs:
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.TOKEN }}
+          username: ${{ secrets.docker_user }}
+          password: ${{ secrets.docker_token }}
 
       - uses: docker/setup-qemu-action@v3
 

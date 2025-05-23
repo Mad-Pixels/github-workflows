@@ -40,10 +40,8 @@ runs:
         echo "API Response:"
         echo "$response" | jq 2>/dev/null || echo "Failed to parse JSON response"
         
-        # Проверяем, является ли ответ массивом или объектом с сообщением об ошибке
         is_array=$(echo "$response" | jq 'if type=="array" then true else false end')
         if [ "$is_array" = "false" ]; then
-          # Если это не массив, проверяем наличие сообщения об ошибке
           error=$(echo "$response" | jq -r '.message // empty')
           echo "::warning::API Response is not an array. Possible error: $error"
           
@@ -63,7 +61,6 @@ runs:
             pr_numbers=$(echo "$search_result" | jq -r '.items[].number' | tr '\n' ',')
             pr_numbers=${pr_numbers%,}  # Remove trailing comma
             echo "PR Numbers: $pr_numbers"
-            # Используем переменную GITHUB_OUTPUT для установки выходных данных
             echo "pr_numbers=$pr_numbers" >> $GITHUB_OUTPUT
             echo "proceed=false" >> $GITHUB_OUTPUT
             exit 0

@@ -6,10 +6,8 @@
         src="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
 </picture>
 
-# Workflows
+# Workflows & Actions
 See [examples](/examples)
-
-
 
 # Contributing
 We're open to any new ideas and contributions. We also have some rules and taboos here, so please read this page and our [Code of Conduct](/CODE_OF_CONDUCT.md) carefully.
