@@ -18,7 +18,7 @@ on:
 
 jobs:
   docker-push:
-    uses: your-org/your-repo/.github/workflows/dockerhub-push.yml@main
+    uses: Mad-Pixels/github-workflows/.github/workflows/dockerhub-build-push.yml@main
     with:
       repository: your-user/your-image
       tag:        v1.0.0

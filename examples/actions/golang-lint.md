@@ -18,9 +18,9 @@ on:
 
 jobs:
   lint:
-    uses: your-org/your-repo/.github/actions/golangci-lint@main
+    uses: "Mad-Pixels/github-workflows/.github/actions/golang-lint@main"
     with:
-      go_dir: "Mad-Pixels/github-workflows/.github/actions/golang-lint@main"
+      go_dir: ./
       go_version: "1.21"
       golangci_lint_version: "v1.56.2"
 ```

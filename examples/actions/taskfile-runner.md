@@ -21,9 +21,9 @@ jobs:
   task:
     runs-on: ubuntu-latest
     steps:
-      - uses: your-org/task-runner@v1
+      - uses: "Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main"
         with:
-          go_dir:     "Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main"
+          go_dir:     "./"
           go_version: "1.22"
           command:    "build"
           vars:       "ENV:production,DEBUG:false"
