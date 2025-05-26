@@ -1,0 +1,98 @@
+name: DockerHub Push
+
+description: Build and Push images (multiplatform) to Dockerhub.
+
+inputs:
+  docker_user:
+    description: 'DockerHub username'
+    required: true
+  docker_token:
+    description: 'DockerHub access token'
+    required: true
+
+  repository:
+    description: 'DockerHub repository name (username/repository)'
+    required: true
+  tag:
+    description: 'Docker image tag'
+    required: true
+
+  platforms:
+    description: 'Comma-separated list of platforms'
+    required: false
+    default: 'linux/amd64,linux/arm64'
+  build_args:
+    description: 'JSON object with build arguments'
+    required: false
+    default: '{}'
+  artifact_name:
+    description: 'Artifact name to download (if using artifacts)'
+    required: false
+    default: ''
+
+  context_path:
+    description: 'Docker build context path'
+    required: false
+    default: '.'
+  dockerfile_path:
+    description: 'Path to Dockerfile relative to context'
+    required: false
+    default: 'Dockerfile'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Prepare context
+      id: prepare-context
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.artifact_name }}" ]; then
+          echo "using_artifact=true" >> $GITHUB_OUTPUT
+          echo "context_path=./artifact/${{ inputs.context_path }}" >> $GITHUB_OUTPUT
+        else
+          echo "using_artifact=false" >> $GITHUB_OUTPUT
+          echo "context_path=${{ inputs.context_path }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Checkout repository
+      if: steps.prepare-context.outputs.using_artifact == 'false'
+      uses: actions/checkout@v4
+
+    - name: Download artifact
+      if: steps.prepare-context.outputs.using_artifact == 'true'
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ./artifact
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ inputs.docker_user }}
+        password: ${{ inputs.docker_token }}
+    
+    - name: Setup QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+
+    - name: Build and push
+      shell: bash
+      run: |
+        BUILD_ARGS=""
+        if [ "${{ inputs.build_args }}" != "{}" ]; then
+          while IFS= read -r arg; do
+            BUILD_ARGS="$BUILD_ARGS $arg"
+          done < <(echo '${{ inputs.build_args }}' | jq -r 'to_entries | .[] | "--build-arg \(.key)=\(.value)"')
+        fi
+
+        docker buildx build \
+          --platform ${{ inputs.platforms }} \
+          --file ${{ steps.prepare-context.outputs.context_path }}/${{ inputs.dockerfile_path }} \
+          $BUILD_ARGS \
+          -t ${{ inputs.repository }}:${{ inputs.tag }} \
+          --push \
+          ${{ steps.prepare-context.outputs.context_path }}
