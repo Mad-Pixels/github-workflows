@@ -32,6 +32,27 @@ runs:
         aws-secret-access-key: ${{ inputs.aws_secret_key }}
         aws-region:            ${{ inputs.aws_region }}
 
+    - name: Test AWS connection step by step
+      shell: bash
+      run: |
+        echo "=== Testing AWS CLI ==="
+        aws --version
+  
+        echo "=== Testing credentials ==="
+        aws sts get-caller-identity
+    
+        echo "=== Testing S3 access ==="
+        aws s3 ls
+    
+        echo "=== Testing specific bucket ==="
+        aws s3 ls s3://${{ inputs.bucket_name }}/
+    
+        echo "=== Testing bucket location ==="
+        aws s3api get-bucket-location --bucket ${{ inputs.bucket_name }}
+    
+        echo "=== Testing bucket policy ==="
+        aws s3api get-bucket-policy --bucket ${{ inputs.bucket_name }} || echo "No bucket policy found"
+
     - name: Sync directory to S3
       shell: bash
       run: |
