@@ -37,9 +37,9 @@ runs:
       run: |
         DEST="s3://${{ inputs.bucket_name }}/${{ inputs.bucket_prefix }}"
         aws s3 sync ${{ inputs.source_dir }} ${DEST} \
-          --region ${{ inputs.aws_region }} #\
-          # --delete \
-          # --exclude ".git/*" \
-          # --exclude ".github/*" \
-          # --exclude ".gitignore" \
-          # --exclude ".gitattributes"
+          --region ${{ inputs.aws_region }} \
+          --delete \
+          --exclude ".git/*" \
+          --exclude ".github/*" \
+          --exclude ".gitignore" \
+          --exclude ".gitattributes"
