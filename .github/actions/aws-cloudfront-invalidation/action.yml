@@ -44,8 +44,13 @@ runs:
         
         aws cloudfront create-invalidation \
           --distribution-id ${{ inputs.distribution_id }} \
-          --paths ${{ inputs.paths }} \
-          --caller-reference "${CALLER_REF}" \
+          --invalidation-batch "{
+            \"Paths\": {
+              \"Quantity\": 1,
+              \"Items\": [\"${{ inputs.paths }}\"]
+            },
+            \"CallerReference\": \"${CALLER_REF}\"
+          }" \
           --no-cli-pager
         
         echo "✅ CloudFront invalidation created successfully!"
