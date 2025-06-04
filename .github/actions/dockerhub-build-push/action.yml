@@ -94,5 +94,6 @@ runs:
           --file ${{ steps.prepare-context.outputs.context_path }}/${{ inputs.dockerfile_path }} \
           $BUILD_ARGS \
           -t ${{ inputs.repository }}:${{ inputs.tag }} \
+          -t ${{ inputs.repository }}:latest \
           --push \
           ${{ steps.prepare-context.outputs.context_path }}
