@@ -1,0 +1,126 @@
+name: 'Tag Creator'
+description: 'Create and manage git tags with validation'
+
+inputs:
+  tag:
+    description: 'Tag to create (e.g., v1.0.0)'
+    required: true
+  token:
+    description: 'GitHub token for authentication'
+    required: true
+
+  force:
+    description: 'Force overwrite existing tag'
+    required: false
+    default: 'false'
+  branch:
+    description: 'Branch to tag from'
+    required: false
+    default: 'main'  
+  tag_format:
+    description: 'Tag format validation regex'
+    required: false
+    default: '^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.branch }}
+        fetch-depth: 0
+        token: ${{ inputs.token }}
+
+    - name: Validate tag format
+      shell: bash
+      run: |
+        TAG="${{ inputs.tag }}"
+        FORMAT="${{ inputs.tag_format }}"
+        
+        if [[ ! "$TAG" =~ $FORMAT ]]; then
+          echo "Invalid tag format: $TAG"
+          echo "Expected format: $FORMAT"
+          exit 1
+        fi
+        echo "Tag format is valid: $TAG"
+
+    - name: Check if tag exists
+      id: check-tag
+      shell: bash
+      run: |
+        TAG="${{ inputs.tag }}"
+        
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "️Tag $TAG already exists"
+          
+          if [ "${{ inputs.force }}" != "true" ]; then
+            echo "Tag already exists. Use 'force' option to overwrite."
+            exit 1
+          else
+            echo "Force option enabled, will overwrite existing tag"
+          fi
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "Tag $TAG is available"
+        fi
+
+    - name: Set Git configuration
+      shell: bash
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+    - name: Create/Update tag
+      shell: bash
+      run: |
+        TAG="${{ inputs.tag }}"
+        BRANCH="${{ inputs.branch }}"
+        COMMIT_SHA=$(git rev-parse HEAD)
+        
+        echo "Tag Details:"
+        echo "  Tag: $TAG"
+        echo "  Commit: $COMMIT_SHA"
+        echo "  Branch: $BRANCH"
+        echo "  Author: ${{ github.actor }}"
+        echo "  Force: ${{ inputs.force }}"
+        echo "  Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+        
+        if [ "${{ steps.check-tag.outputs.exists }}" == "true" ] && [ "${{ inputs.force }}" == "true" ]; then
+          echo "Updating existing tag..."
+          git tag -f "$TAG" "$COMMIT_SHA"
+          git push origin ":refs/tags/$TAG" 
+          sleep 2
+          git push origin "$TAG"
+          echo "Tag $TAG updated successfully"
+        else
+          echo "Creating new tag..."
+          git tag "$TAG" "$COMMIT_SHA"
+          git push origin "$TAG"
+          echo "Tag $TAG created successfully"
+        fi
+
+    - name: Verify tag creation
+      shell: bash
+      run: |
+        TAG="${{ inputs.tag }}"
+        
+        # Verify local tag
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "Local tag verified: $TAG"
+        else
+          echo "Local tag verification failed"
+          exit 1
+        fi
+        
+        # Wait a bit for remote sync
+        sleep 3
+        
+        # Verify remote tag
+        if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+          echo "Remote tag verified: $TAG"
+          echo "Tag creation completed successfully!"
+        else
+          echo "Remote tag verification might be delayed, but push was successful"
+        fi
