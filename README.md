@@ -14,21 +14,21 @@ Scripts and tooling are scattered, environments drift, and debugging CI becomes 
 
 ### Core Philosophy: Taskfile-Centric Development
 We define all developer-facing tasks in `Taskfile.yml` ([taskfile](https://taskfile.dev/)), making it the **single source of truth** for every operation:
-- 🟢 **Consistent across environments** — same commands work locally and in CI
-- 🐳 **Containerized by default** — all tasks run securely in isolated Docker containers
-- 🔧 **Empowers developers** — no hidden magic, all tools and commands are transparent and reproducible
+- 🟢 `Consistent across environments` — same commands work locally and in CI
+- 🐳 `Containerized by default` — all tasks run securely in isolated Docker containers
+- 🔧 `Empowers developers` — no hidden magic, all tools and commands are transparent and reproducible
 
 ### Secure Container Execution
 Each task runs in a hardened, ephemeral container:
-- 🔒 **Security-first** — dropped capabilities, non-root users, read-only mounts
-- 📦 **Explicit tooling** — versions are locked (e.g. Node 23, Terraform 1.8.5)
-- 🔁 **Unified interface** — all orchestration handled by a single internal `_docker/run` task
+- 🔒 `Security-first` — dropped capabilities, non-root users, read-only mounts
+- 📦 `Explicit tooling` — versions are locked (e.g. Node 23, Terraform 1.8.5)
+- 🔁 `Unified interface` — all orchestration handled by a single internal `_docker/run` task
 
 ### GitOps-Driven by Design
 This approach follows GitOps principles:
-- ✍️ **Declarative** — all tasks defined and version-controlled in Git
-- 🔁 **Reproducible** — identical environments at every run
-- 🕵️‍♂️ **Auditable** — clear separation between dev and deploy operations
+- ✍️ `Declarative` — all tasks defined and version-controlled in Git
+- 🔁 `Reproducible` — identical environments at every run
+- 🕵️‍♂️ `Auditable` — clear separation between dev and deploy operations
 
 ### Local-to-CI Reproducibility
 If it works locally, it works in CI — **guaranteed**:
@@ -39,23 +39,23 @@ If it works locally, it works in CI — **guaranteed**:
 
 ### Deployment: Controlled & Isolated
 Deployment operations live in **reusable GitHub Actions**, completely separate from development tasks:
-- 🧱 **Clear separation** — developers focus on code, platform handles deployment  
-- 🔐 **Secure by design** — production access restricted to approved CI events
-- 🔁 **Reusable workflows** — standardized deployment patterns across projects
+- 🧱 `Clear separation` — developers focus on code, platform handles deployment  
+- 🔐 `Secure by design` — production access restricted to approved CI events
+- 🔁 `Reusable workflows` — standardized deployment patterns across projects
 
 ### Business Benefits
-- 💰 **Reduced maintenance cost** — no more “works on my machine” syndrome
-- 🚀 **Faster delivery** — fewer environment-specific bugs
-- 🔐 **Stronger security** — containerized, read-only, non-root execution
-- 📋 **Clear audit trails** — Git history = deployment history
-- 🧠 **Better onboarding** — new engineers only need Docker and `task`
+- 💰 `Reduced maintenance cost` — no more “works on my machine” syndrome
+- 🚀 `Faster delivery` — fewer environment-specific bugs
+- 🔐 `Stronger security` — containerized, read-only, non-root execution
+- 📋 `Clear audit trails` — Git history = deployment history
+- 🧠 `Better onboarding` — new engineers only need Docker and `task`
 
 ## Getting Started
 
 ### Prerequisites
-- 🐳 **Docker** — all tasks run in containers
-- 📋 **Task** — install from [taskfile.dev](https://taskfile.dev/installation/)
-- 🐙 **Git** — for version control and workflow triggers
+- 🐳 `Docker` — all tasks run in containers
+- 📋 `Task` — install from [taskfile.dev](https://taskfile.dev/installation/)
+- 🐙 `Git` — for version control and workflow triggers
 
 ### Step 1: Structure Your Project
 Create the foundation for Taskfile-centric development:
