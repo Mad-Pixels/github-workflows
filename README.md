@@ -75,7 +75,7 @@ Establish the foundation for containerized task execution with our proven securi
 _docker/run:
   internal: true
   cmd: |
-    docker run --rm --init {{if .TTY}}-it{{end}} \
+    docker run --rm --init {{if .TTY}}-it{{end}} \ 
       --cap-drop=ALL \
       --security-opt no-new-privileges \
       --user $(id -u):$(id -g) \
@@ -94,8 +94,11 @@ lint:
     - task: _docker/run
       vars:
         IMAGE: "node:20"
-        CMD: "npm run lint"
+        CMD: "sh -c 'npm ci && npx eslint .'"
         MOUNT_DIR: "."
+        ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
 
 test:
   desc: "Run test suite"
@@ -105,45 +108,72 @@ test:
         IMAGE: "golang:1.21"
         CMD: "go test ./..."
         MOUNT_DIR: "."
+
+run_dev:
+    desc: Run dev on {{ .dev_port }}.
+    deps:
+      - _image/prepare
+    cmds: 
+      - task: _docker/run 
+        vars: 
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npm run dev -- --host 0.0.0.0 --port {{ .dev_port }}'"
+          MOUNT_DIR: "site"
+          PORTS:
+            - "{{ .dev_port }}:{{ .dev_port }}"
+          ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+          TTY: "true" # Interactive mode for dev servers
 ...
 ```
 
-Step 3: Design Your Task Structure
+### Step 3: Design Your Task Structure
 Build tasks around developer-facing operations that need local execution and debugging:
-✅ Include in Taskfile:
-lint — code quality checks
-format — code formatting
-test — unit and integration tests
-build — compilation and bundling
-dev — local development server
-type-check — static analysis
+✅ Include in Taskfile examples:
+- lint for code quality checks
+- code formatting
+- unit and integration tests
+- compilation and bundling
+- local development server
+- static analysis
 
-❌ Keep out of Taskfile:
-Deployment operations
-Infrastructure management
-Production secrets handling
-Cloud resource provisioning
+❌ Keep out of Taskfile examples:
+- Deployment operations
+- Infrastructure management
+- Production secrets handling
+- Cloud resource provisioning
 
-Step 4: Connect to CI
-Use our `taskfile-runner` action to execute the same tasks in GitHub Actions:
+### Step 4: Connect to CI
+Use our [taskfile-runner](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/actions/taskfile-runner/action.yml) action to execute the same tasks in GitHub Actions:
 ```yaml
 # .github/workflows/ci.yml
 name: CI Pipeline
 on: [push, pull_request]
 
 jobs:
-  quality-checks:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Run linting
-        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
-        with:
-          command: "lint"
+    quality-checks:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Run linting
+            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+            with:
+              command: "lint"
           
-      - name: Run tests  
-        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
-        with:
-          command: "test"
+          - name: Run tests  
+            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+            with:
+              command: "test"
+    build:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Build
+            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+            with:
+              command: "build"
+
+    # CD part which not implement in Taskfile
+    deploy:
+        runs-on: ubuntu-latest
+        ... your deploy process ...
 ```
