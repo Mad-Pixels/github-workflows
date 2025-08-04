@@ -88,16 +88,6 @@ tasks:
             - "NPM_CONFIG_UPDATE_NOTIFIER=false"
     silent: true
 
-  terraform/fmt:
-    desc: Check 'terraform fmt' compliance (fails if not formatted).
-    cmds:
-      - task: _docker/run
-        vars:
-          IMAGE: "hashicorp/terraform:{{.terraform}}"
-          CMD: "fmt -check -recursive -diff"
-          MOUNT_DIR: "terraform"
-    silent: true
-
   node/audit:
     desc: Run dependencies audit.
     cmds:
