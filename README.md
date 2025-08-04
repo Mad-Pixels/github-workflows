@@ -219,4 +219,4 @@ git checkout -b feature/my-cool-task
 Feel free to open issues for bugs or feature requests, and tag them with appropriate labels.
 
 ## License
-This repository is licensed under the [./LICENSE] _(Apache License 2.0)_.
+This repository is licensed under the [license](./LICENSE) _(Apache License 2.0)_.
