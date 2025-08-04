@@ -129,7 +129,7 @@ run_dev:
 ```
 
 ### Step 3: Design Your Task Structure
-Build tasks around developer-facing operations that need local execution and debugging:
+Build tasks around developer-facing operations that need local execution and debugging:  
 ✅ Include in Taskfile examples:
 - lint for code quality checks
 - code formatting
