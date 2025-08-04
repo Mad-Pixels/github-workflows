@@ -23,6 +23,7 @@
   - [Step 4: Connect to CI](#step-4-connect-to-ci)
 - [Real-World examples](#real-world-examples)
 - [Contributing](#contributing)
+- [License](#license)
 
 ## Concept
 
@@ -216,3 +217,6 @@ git checkout -b feature/my-cool-task
 6. We’ll review, suggest feedback, and merge when ready!
 
 Feel free to open issues for bugs or feature requests, and tag them with appropriate labels.
+
+## License
+This repository is licensed under the [./LICENSE] _(Apache License 2.0)_.
