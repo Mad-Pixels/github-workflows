@@ -21,6 +21,8 @@
   - [Step 2: Create Secure Container Runtime](#step-2-create-secure-container-runtime)
   - [Step 3: Design Your Task Structure](#step-3-design-your-task-structure)
   - [Step 4: Connect to CI](#step-4-connect-to-ci)
+- [Real-World examples](#real-world-examples)
+- [Contributing](#contributing)
 
 ## Concept
 
@@ -190,3 +192,27 @@ jobs:
       runs-on: ubuntu-latest
       ... your deploy process ...
 ```
+
+## Real-World Examples
+To make adoption as smooth as possible, we’ve prepared several opinionated example projects under [examples/](https://github.com/Mad-Pixels/github-workflows/tree/main/examples).  
+Each contains its own `Taskfile.yml` and CI workflow, and is fully runnable out of the box:
+
+| Example                               | Description                                                                                             |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------|
+| [nodejs](./examples/nodejs)           | Minimal Node.js starter: lint, format, unit tests, build, and dev server all in Docker.                 |
+
+## Contributing
+We ❤️ community contributions! To get started:
+1. **Fork** the repo and create your feature branch:
+```bash
+git clone git@github.com:Mad-Pixels/.github.git
+cd .github
+git checkout -b feature/my-cool-task
+```
+2. Make your changes in Taskfile.yml, workflows, or docs.
+3. Run the examples locally to verify nothing breaks
+4. Commit your changes
+5. Push and open a Pull Request against `main`.
+6. We’ll review, suggest feedback, and merge when ready!
+
+Feel free to open issues for bugs or feature requests, and tag them with appropriate labels.
