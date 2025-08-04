@@ -130,19 +130,14 @@ run_dev:
 
 ### Step 3: Design Your Task Structure
 Build tasks around developer-facing operations that need local execution and debugging:  
-✅ Include in Taskfile examples:
-- lint for code quality checks
-- code formatting
-- unit and integration tests
-- compilation and bundling
-- local development server
-- static analysis
-
-❌ Keep out of Taskfile examples:
-- Deployment operations
-- Infrastructure management
-- Production secrets handling
-- Cloud resource provisioning
+| ✅ Include in Taskfile examples             | ❌ Keep out of Taskfile examples      |
+|---------------------------------------------|---------------------------------------|
+| lint for code quality checks                | Deployment operations                 |
+| code formatting                             | Infrastructure management             |
+| unit and integration tests                  | Production secrets handling           |
+| compilation and bundling                    | Cloud resource provisioning           |
+| local development server                    |                                       |
+| static analysis                             |                                       |
 
 ### Step 4: Connect to CI
 Use our [taskfile-runner](https://github.com/Mad-Pixels/github-workflows/blob/main/.github/actions/taskfile-runner/action.yml) action to execute the same tasks in GitHub Actions:
