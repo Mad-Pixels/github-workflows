@@ -132,10 +132,10 @@ run_dev:
 Build tasks around developer-facing operations that need local execution and debugging:  
 | ✅ Include in Taskfile examples             | ❌ Keep out of Taskfile examples      |
 |---------------------------------------------|---------------------------------------|
-| lint for code quality checks                | Deployment operations                 |
-| code formatting                             | Infrastructure management             |
-| unit and integration tests                  | Production secrets handling           |
-| compilation and bundling                    | Cloud resource provisioning           |
+| lint for code quality checks                | deployment operations                 |
+| code formatting                             | infrastructure management             |
+| unit and integration tests                  | production secrets handling           |
+| compilation and bundling                    | cloud resource provisioning           |
 | local development server                    |                                       |
 | static analysis                             |                                       |
 
