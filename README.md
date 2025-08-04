@@ -145,7 +145,6 @@ run_dev:
             - "NPM_CONFIG_CACHE=/workspace/.cache"
             - "NPM_CONFIG_UPDATE_NOTIFIER=false"
           TTY: "true" # Interactive mode for dev servers
-...
 ```
 
 ### Step 3: Design Your Task Structure
