@@ -6,6 +6,22 @@
 
 # 🚀 GitHub Workflows & Actions Library
 
+## Table of Contents
+- [Concept](#concept)
+  - [The Problem](#the-problem)
+  - [Core Philosophy: Taskfile-Centric Development](#core-philosophy-taskfile-centric-development)
+  - [Secure Container Execution](#secure-container-execution)
+  - [GitOps-Driven by Design](#gitops-driven-by-design)
+  - [Local-to-CI Reproducibility](#local-to-ci-reproducibility)
+  - [Deployment: Controlled & Isolated](#deployment-controlled--isolated)
+  - [Business Benefits](#business-benefits)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Step 1: Structure Your Project](#step-1-structure-your-project)
+  - [Step 2: Create Secure Container Runtime](#step-2-create-secure-container-runtime)
+  - [Step 3: Design Your Task Structure](#step-3-design-your-task-structure)
+  - [Step 4: Connect to CI](#step-4-connect-to-ci)
+
 ## Concept
 
 ### The Problem
