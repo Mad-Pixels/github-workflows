@@ -279,9 +279,9 @@ jobs:
 To make adoption as smooth as possible, we’ve prepared several opinionated example projects under [examples/](https://github.com/Mad-Pixels/github-workflows/tree/main/examples).  
 Each contains its own `Taskfile.yml` and CI workflow, and is fully runnable out of the box:
 
-| Example                               | Description                                                                                             |
-|---------------------------------------|---------------------------------------------------------------------------------------------------------|
-| [nodejs](./examples/nodejs)           | Minimal Node.js starter: lint, format, unit tests, build, and dev server all in Docker.                 |
+| Example                               | Description                                                                                                   |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| [nodejs](./examples/flows/nodejs)     | Minimal Node.js starter: lint, format, unit tests, build, deploy (external job) and dev server all in Docker. |
 
 ## Contributing
 We ❤️ community contributions! To get started:
