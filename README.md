@@ -220,7 +220,7 @@ run_dev:
         vars: 
           IMAGE: "node:{{.node_version}}"
           CMD: "sh -c 'npm ci && npm run dev -- --host 0.0.0.0 --port {{ .dev_port }}'"
-          MOUNT_DIR: "site"
+          MOUNT_DIR: "."
           PORTS:
             - "{{ .dev_port }}:{{ .dev_port }}"
           ENVS:
