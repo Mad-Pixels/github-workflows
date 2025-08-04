@@ -75,13 +75,16 @@ Establish the foundation for containerized task execution with our proven securi
 _docker/run:
   internal: true
   cmd: |
-    docker run --rm --init {{if .TTY}}-it{{end}} \ 
+    docker run --rm --init {{if .TTY}}-it{{end}} \
       --cap-drop=ALL \
       --security-opt no-new-privileges \
       --user $(id -u):$(id -g) \
       --workdir /workspace \
-      --volume "{{.PWD}}/{{.MOUNT_DIR}}:/workspace:rw" \
-      {{.IMAGE}} {{.CMD}}
+      --volume "{{.git_root}}/{{.MOUNT_DIR}}:/workspace:rw" \
+      {{if .ENVS}}{{range $env := .ENVS}}--env {{$env}} {{end}}{{end}} \
+      {{if .PORTS}}{{range $port := .PORTS}}--publish {{$port}} {{end}}{{end}} \
+      {{.IMAGE}} \
+      {{.CMD}}
   requires:
     vars: [IMAGE, CMD, MOUNT_DIR]
 ```
