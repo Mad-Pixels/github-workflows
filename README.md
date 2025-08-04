@@ -1,7 +1,7 @@
 <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
-    <img alt="MadPixels" src="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
+  <img alt="MadPixels" src="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
 </picture>
 
 # 🚀 GitHub Workflows & Actions Library
@@ -97,8 +97,8 @@ lint:
         CMD: "sh -c 'npm ci && npx eslint .'"
         MOUNT_DIR: "."
         ENVS:
-            - "NPM_CONFIG_CACHE=/workspace/.cache"
-            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+          - "NPM_CONFIG_CACHE=/workspace/.cache"
+          - "NPM_CONFIG_UPDATE_NOTIFIER=false"
 
 test:
   desc: "Run test suite"
@@ -111,8 +111,6 @@ test:
 
 run_dev:
     desc: Run dev on {{ .dev_port }}.
-    deps:
-      - _image/prepare
     cmds: 
       - task: _docker/run 
         vars: 
@@ -147,28 +145,29 @@ name: CI Pipeline
 on: [push, pull_request]
 
 jobs:
-    quality-checks:
-        runs-on: ubuntu-latest
-        steps:
-          - name: Run linting
-            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
-            with:
-              command: "lint"
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run linting
+        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+        with:
+          command: "lint"
           
-          - name: Run tests  
-            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
-            with:
-              command: "test"
-    build:
-        runs-on: ubuntu-latest
-        steps:
-          - name: Build
-            uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
-            with:
-              command: "build"
+      - name: Run tests  
+        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+        with:
+          command: "test"
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build
+        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+        with:
+          command: "build"
 
     # CD part which not implement in Taskfile
     deploy:
-        runs-on: ubuntu-latest
-        ... your deploy process ...
+      runs-on: ubuntu-latest
+      ... your deploy process ...
 ```
