@@ -4,8 +4,8 @@ vars:
   git_root:
     sh: git rev-parse --show-toplevel
   
-  node_version: "23"
-  dev_port: 3000
+  node_version: "23" # setup default node version
+  dev_port: 3000     # setup default port for start dev env
 
 tasks:
   default:
@@ -40,32 +40,6 @@ tasks:
 # ================================================#
 # ----------------------PUBLIC--------------------#
 # ================================================#
-
-  node/lint/fix:
-    desc: Run ESLint with fix flag.
-    cmds:
-      - task: _docker/run
-        vars:
-          IMAGE: "node:{{.node_version}}"
-          CMD: "sh -c 'npm ci && npx eslint . --fix'"
-          MOUNT_DIR: "."
-          ENVS: 
-            - "NPM_CONFIG_CACHE=/workspace/.cache"
-            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
-    silent: true
-
-  node/format/fix:
-    desc: Run Prettier.
-    cmds:
-      - task: _docker/run
-        vars:
-          IMAGE: "node:{{.node_version}}"
-          CMD: "sh -c 'npm ci && npx prettier --write src/'"
-          MOUNT_DIR: "."
-          ENVS:
-            - "NPM_CONFIG_CACHE=/workspace/.cache"
-            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
-    silent: true
 
   dev: 
     desc: Run dev on {{ .dev_port }}. 
