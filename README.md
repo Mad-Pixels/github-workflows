@@ -269,10 +269,10 @@ jobs:
         with:
           command: "build"
 
-    # CD part which not implement in Taskfile
-    deploy:
-      runs-on: ubuntu-latest
-      ... your deploy process ...
+  # CD part which not implement in Taskfile
+  deploy:
+    runs-on: ubuntu-latest
+    ... your deploy process ...
 ```
 
 ## Real-World Examples
