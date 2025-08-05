@@ -1,0 +1,128 @@
+version: '3'
+
+vars:
+  git_root:
+    sh: git rev-parse --show-toplevel
+  
+  node_version: "23" # setup default node version
+  dev_port: 3000     # setup default port for start dev env
+
+tasks:
+  default:
+    desc: Default task.
+    cmds:
+      - echo "Please enter a task or use '-l' or '--list-all' to list all available tasks"
+    silent: true
+
+# ================================================#
+# ---------------------INTERNAL-------------------#
+# ================================================#
+
+  _docker/run:
+    desc: Internal task to run secure container.
+    internal: true
+    dir: "{{.git_root}}"
+    cmd: |
+      docker run --rm --init {{if .TTY}}-it{{end}} \
+        --cap-drop=ALL \
+        --security-opt no-new-privileges \
+        --user $(id -u):$(id -g) \
+        --workdir /workspace \
+        {{if .ENVS}}{{range $env := .ENVS}}--env {{$env}} {{end}}{{end}}\
+        {{if .PORTS}}{{range $port := .PORTS}}--publish {{$port}} {{end}}{{end}}\
+        --volume "{{.git_root}}/{{.MOUNT_DIR}}:/workspace:rw" \
+        {{.IMAGE}} \
+        {{.CMD}}
+    silent: true
+    requires:
+      vars: [IMAGE, CMD, MOUNT_DIR]
+
+# ================================================#
+# ----------------------PUBLIC--------------------#
+# ================================================#
+
+  dev: 
+    desc: Run dev on {{ .dev_port }}. 
+    deps:
+      - _image/prepare
+    cmds: 
+      - task: _docker/run 
+        vars: 
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npm run dev -- --host 0.0.0.0 --port {{ .dev_port }}'"
+          MOUNT_DIR: "."
+          PORTS:
+            - "{{ .dev_port }}:{{ .dev_port }}"
+          ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+          TTY: "true"
+
+# ================================================#
+# ----------------------CI/CD---------------------#
+# ================================================#
+
+  node/lint:
+    desc: Run ESLint.
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npx eslint .'"
+          MOUNT_DIR: "."
+          ENVS: 
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+    silent: true
+
+  node/format:
+    desc: Run Prettier.
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npx prettier --check src/'"
+          MOUNT_DIR: "."
+          ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+    silent: true
+
+  node/audit:
+    desc: Run dependencies audit.
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npm audit --audit-level high'"
+          MOUNT_DIR: "."
+          ENVS: 
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+    silent: true
+
+  node/type-check:
+    desc: TypeScript type checking.
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm ci && npm run type-check'"
+          MOUNT_DIR: "."
+          ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+    silent: true
+
+  node/build:
+    desc: Build production version.
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "node:{{.node_version}}"
+          CMD: "sh -c 'npm install && npm run build'"
+          MOUNT_DIR: "."
+          ENVS:
+            - "NPM_CONFIG_CACHE=/workspace/.cache"
+            - "NPM_CONFIG_UPDATE_NOTIFIER=false"
+    silent: true

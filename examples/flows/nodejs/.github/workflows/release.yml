@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-tag-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  check-main-branch:
+    name: Verify tag from main branch
+    runs-on: ${{ vars.RUNS_ON }}
+    steps:
+      - name: Invoke
+        uses: Mad-Pixels/github-workflows/.github/actions/github-check-branch@main
+        with:
+          tag_name: ${{ github.ref_name }}
+
+  apply:
+    needs: check-main-branch
+    uses: ./.github/workflows/.terraform.yml
+    name: Apply
+    with:
+      tf_command: "apply"
+    secrets:
+      aws_access_key:     ${{ secrets.AWS_ACCESS_KEY }}
+      aws_secret_key:     ${{ secrets.AWS_SECRET_KEY }}
+      aws_region:         ${{ secrets.AWS_REGION }}
+
+      aws_backend_bucket: ${{ secrets.AWS_BACKEND_BUCKET }}
+      aws_backend_region: ${{ secrets.AWS_BACKEND_REGION }}
+      aws_backend_key:    ${{ secrets.AWS_BACKEND_KEY }}
+
+      acm_crt:            ${{ secrets.ACM_CRT }}
+      bucket_name:        ${{ secrets.SITE_BUCKET_NAME }}
+  
+  build:
+    needs: check-main-branch
+    runs-on: ${{ vars.RUNS_ON }}
+    name: Build
+    steps:
+      - name: Invoke 
+        uses: Mad-Pixels/github-workflows/.github/actions/taskfile-runner@main
+        with:
+          command: node/build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/dist/
+          retention-days: 7
+
+  deploy:
+    needs: [build, apply]
+    runs-on: ${{ vars.RUNS_ON }}
+    name: Deploy
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: build-output
+
+      - name: Invoke 
+        uses: Mad-Pixels/github-workflows/.github/actions/aws-s3-sync@main
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_KEY }}
+          aws_region:     ${{ secrets.AWS_REGION }}
+
+          bucket_name:    "site-personal-${{ secrets.SITE_BUCKET_NAME }}"
+          source_dir:     "build-output"
+
+      - name: Invalidate cache
+        uses: Mad-Pixels/github-workflows/.github/actions/aws-cloudfront-invalidation@main
+        with:
+          aws_access_key:   ${{ secrets.AWS_ACCESS_KEY }}
+          aws_secret_key:   ${{ secrets.AWS_SECRET_KEY }}
+          aws_region:       ${{ secrets.AWS_REGION }}
+          distribution_id:  ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          
+          paths:            "/*"
+          caller_reference: "release-${{ github.ref_name }}"
+
