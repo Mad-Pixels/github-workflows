@@ -1,3 +1,7 @@
-# Found security issue
+# Security Policy
 
-Let us know about it at hello@madpixels.io or create an issue in [Issues](https://github.com/Mad-Pixels/github-workflows/issues) page.
+If you found a security vulnerability in this project, please report it responsibly.
+
+📧 Contact: [hello@madpixels.io](mailto:hello@madpixels.io)
+
+Please **do not disclose** security issues publicly before we've had a chance to review and address them.
