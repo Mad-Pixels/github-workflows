@@ -83,16 +83,6 @@ runs:
       run: |
         set -eo pipefail
 
-        if [[ -z "${{ inputs.aws_access_key }}" && -z "${{ inputs.role_to_assume }}" ]]; then
-          echo "❌ Provide either 'aws_access_key' or 'role_to_assume'"
-          exit 1
-        fi
-
-        if [[ -n "${{ inputs.aws_access_key }}" && -z "${{ inputs.aws_secret_key }}" ]]; then
-          echo "❌ 'aws_secret_key' must be set when using 'aws_access_key'"
-          exit 1
-        fi
-
         if [[ ! "$BUCKET_NAME" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
           echo "❌ Invalid S3 bucket name: $BUCKET_NAME"
           exit 1
@@ -110,20 +100,13 @@ runs:
 
         echo "✅ Inputs validated"
 
-    - name: Configure AWS credentials (OIDC)
-      if: inputs.role_to_assume != ''
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Configure AWS authentication
+      uses: ./actions/internal/aws-auth
       with:
-        role-to-assume: ${{ inputs.role_to_assume }}
-        aws-region: ${{ inputs.aws_region }}
-
-    - name: Configure AWS credentials (access key)
-      if: inputs.role_to_assume == ''
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ inputs.aws_access_key }}
-        aws-secret-access-key: ${{ inputs.aws_secret_key }}
-        aws-region: ${{ inputs.aws_region }}
+        aws_access_key: ${{ inputs.aws_access_key }}
+        aws_secret_key: ${{ inputs.aws_secret_key }}
+        role_to_assume: ${{ inputs.role_to_assume }}
+        aws_region: ${{ inputs.aws_region }}
 
     - name: Check S3 bucket access
       shell: bash

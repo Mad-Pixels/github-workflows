@@ -1,0 +1,65 @@
+name: 'AWS Authentication'
+description: 'Internal composite action for AWS authentication (OIDC or Access Keys)'
+
+inputs:
+  aws_access_key:
+    description: 'AWS access key ID (optional if using OIDC)'
+    required: false
+  aws_secret_key:
+    description: 'AWS secret access key (optional if using OIDC)'
+    required: false
+  role_to_assume:
+    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    required: false
+  aws_region:
+    description: 'AWS region'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Validate authentication inputs
+      shell: bash
+      run: |
+        set -eo pipefail
+        
+        if [[ -z "${{ inputs.aws_access_key }}" && -z "${{ inputs.role_to_assume }}" ]]; then
+          echo "❌ Provide either 'aws_access_key' or 'role_to_assume'"
+          exit 1
+        fi
+
+        if [[ -n "${{ inputs.aws_access_key }}" && -z "${{ inputs.aws_secret_key }}" ]]; then
+          echo "❌ 'aws_secret_key' must be set when using 'aws_access_key'"
+          exit 1
+        fi
+
+        if [[ -n "${{ inputs.role_to_assume }}" ]]; then
+          echo "🔐 Using OIDC authentication with role: ${{ inputs.role_to_assume }}"
+        else
+          echo "🔑 Using AWS access keys authentication"
+        fi
+
+    - name: Configure AWS credentials (OIDC)
+      if: inputs.role_to_assume != ''
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.role_to_assume }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Configure AWS credentials (access key)
+      if: inputs.role_to_assume == ''
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key }}
+        aws-secret-access-key: ${{ inputs.aws_secret_key }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Verify AWS credentials
+      shell: bash
+      run: |
+        echo "🔐 Verifying AWS credentials..."
+        aws sts get-caller-identity || {
+          echo "❌ AWS credentials verification failed"
+          exit 1
+        }
+        echo "✅ AWS authentication successful"
