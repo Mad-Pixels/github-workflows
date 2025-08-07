@@ -1,6 +1,6 @@
 name: Task Runner
 
-description: Run Taskfile command from container with Docker socket passthrough
+description: Run Taskfile command using task binary from container, with Docker socket passthrough
 
 inputs:
   go_dir:
@@ -14,7 +14,7 @@ inputs:
     description: "Optional environment variables in format key:value,key:value"
     required: false
   image:
-    description: "Task image"
+    description: "Task image (used only to extract binary)"
     required: false
     default: "ghcr.io/mad-pixels/images/taskfile:v3.44.1"
 
@@ -24,23 +24,24 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Parse and export env
-      if: ${{ inputs.vars != '' }}
-      shell: bash
-      run: |
-        echo "DOCKER_ENV=" >> $GITHUB_OUTPUT
-        echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
-          echo "$key=$value" >> $GITHUB_ENV
-          echo "--env $key=$value" >> $GITHUB_OUTPUT
-        done
-
-    - name: Run Task inside Docker
+    - name: Extract task binary from container
       shell: bash
       run: |
         docker run --rm \
-          --entrypoint /bin/sh \
-          -v "$PWD:/work" \
-          -v /var/run/docker.sock:/var/run/docker.sock \
-          -w "/work/${{ inputs.go_dir }}" \
-          ${{ inputs.image }} \
-          -c "git config --global --add safe.directory /work && task ${{ inputs.command }}"
+          --entrypoint cat \
+          ${{ inputs.image }} /usr/local/bin/task > ./task
+        chmod +x ./task
+
+    - name: Parse and export environment variables
+      if: ${{ inputs.vars != '' }}
+      shell: bash
+      run: |
+        echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
+          echo "$key=$value" >> $GITHUB_ENV
+        done
+
+    - name: Run Task on host
+      shell: bash
+      working-directory: ${{ inputs.go_dir }}
+      run: |
+        ../task ${{ inputs.command }}
