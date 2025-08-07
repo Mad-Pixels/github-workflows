@@ -41,6 +41,5 @@ runs:
           -v "$PWD:/work" \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -w "/work/${{ inputs.go_dir }}" \
-          ${{ steps.parse-and-export-env.outputs.DOCKER_ENV }} \
           ${{ inputs.image }} \
-          ${{ inputs.command }}
+          /bin/sh -c "git config --global --add safe.directory /work && task ${{ inputs.command }}"
