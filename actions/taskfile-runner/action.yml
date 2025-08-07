@@ -1,30 +1,32 @@
 name: Task Runner
-
-description: Run Taskfile
+description: Run Taskfile task using specified version and env variables
 
 inputs:
-  go_dir:
-    description: "Working directory inside the project"
-    required: false
-    default: "."
   command:
-    description: "Task command to run"
+    description: 'Task command to run (e.g. "build" or "lint")'
     required: true
+
   vars:
-    description: "Optional environment variables in format key:value,key:value"
+    description: 'Optional environment variables in format key:value,key:value'
     required: false
+
+  dir:
+    description: 'Working directory inside the project'
+    required: false
+    default: '.'
+
   version:
-    description: "Task version to use"
+    description: 'Task binary version to use'
     required: false
-    default: "3.44.1"
+    default: '3.44.1'
 
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Detect architecture and download task binary
+    - name: Detect architecture and install Task binary
       shell: bash
       run: |
         set -euo pipefail
@@ -33,29 +35,35 @@ runs:
         case "$ARCH" in
           x86_64) ARCH="amd64" ;;
           aarch64) ARCH="arm64" ;;
-          *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+          *) echo "❌ Unsupported architecture: $ARCH" && exit 1 ;;
         esac
 
         VERSION="${{ inputs.version }}"
-        echo "Downloading Task v$VERSION for $ARCH..."
+        echo "⬇️  Downloading Task v$VERSION for $ARCH..."
 
         curl -sL "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz" \
           | tar -xz -C /tmp
 
         sudo mv /tmp/task /usr/local/bin/task
         sudo chmod +x /usr/local/bin/task
+
+        echo "✅ Installed task binary:"
         task --version
 
     - name: Export environment variables
       if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
+        echo "🌐 Exporting env vars:"
         echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
+          echo "  - $key=$value"
           echo "$key=$value" >> $GITHUB_ENV
         done
 
-    - name: Run Task
+    - name: Run Taskfile command
       shell: bash
-      working-directory: ${{ inputs.go_dir }}
+      working-directory: ${{ inputs.dir }}
       run: |
+        echo "🚀 Running task ${{ inputs.command }} in $PWD"
         task ${{ inputs.command }}
+
