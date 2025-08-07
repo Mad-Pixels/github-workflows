@@ -1,0 +1,40 @@
+name: Create Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (e.g., v1.0.0)'
+        required: true
+        type: string
+      force:
+        description: 'Force overwrite existing tag'
+        required: false
+        type: boolean
+        default: false
+      message:
+        description: 'Tag message (optional, creates annotated tag)'
+        required: false
+        type: string
+
+concurrency:
+  group: manual-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create Tag
+    runs-on: ${{ vars.RUNS_ON }}
+    steps:
+      - name: Create tag from main branch
+        id: tag
+        uses: Mad-Pixels/github-workflows/actions/github-create-tag@main
+        with:
+          tag: ${{ inputs.tag }}
+          force: ${{ inputs.force }}
+          branch: 'main'
+          message: ${{ inputs.message }}
+          token: ${{ secrets.GITHUB_TOKEN }}
