@@ -27,21 +27,20 @@ runs:
     - name: Extract task binary from container
       shell: bash
       run: |
-        docker run --rm \
-          --entrypoint cat \
-          ${{ inputs.image }} /usr/local/bin/task > ./task
-        chmod +x ./task
+        docker run --rm --entrypoint cat \
+          ${{ inputs.image }} /usr/local/bin/task > "$GITHUB_WORKSPACE/task"
+        chmod +x "$GITHUB_WORKSPACE/task"
 
     - name: Parse and export environment variables
       if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
         echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
-          echo "$key=$value" >> $GITHUB_ENV
+          echo "$key=$value" >> "$GITHUB_ENV"
         done
 
     - name: Run Task on host
       shell: bash
       working-directory: ${{ inputs.go_dir }}
       run: |
-        ../task ${{ inputs.command }}
+        "$GITHUB_WORKSPACE/task" ${{ inputs.command }}
