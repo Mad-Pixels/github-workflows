@@ -57,9 +57,10 @@ runs:
     - name: Verify AWS credentials
       shell: bash
       run: |
-        echo "🔐 Verifying AWS credentials..."
-        aws sts get-caller-identity || {
+        echo "::group::🔐 Verifying AWS credentials..."
+        aws sts get-caller-identity --output text --query 'Account' >/dev/null || {
           echo "❌ AWS credentials verification failed"
           exit 1
         }
         echo "✅ AWS authentication successful"
+        echo "::endgroup::"
