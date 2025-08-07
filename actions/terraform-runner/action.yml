@@ -20,7 +20,7 @@ inputs:
     required: false
     default: ""
   tf_command:
-    description: 'Terraform command: [plan, apply]'
+    description: 'Terraform command: [plan, apply, destroy]'
     required: true
     default: plan
   tf_vars:
@@ -46,14 +46,22 @@ runs:
   using: composite
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
+      uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-access-key-id:     ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region:            ${{ inputs.aws_region }}
+
+    - name: Verify AWS credentials
+      shell: bash
+      run: |
+        aws sts get-caller-identity || {
+          echo "❌ AWS credentials verification failed"
+          exit 1
+        }
 
     - name: Export AWS region for Terraform
       shell: bash
@@ -69,21 +77,21 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       run: |
         cat > backend_aws.hcl <<EOF
-        bucket  = "${{ inputs.backend_bucket }}"
-        key     = "${{ inputs.backend_key }}"
-        region  = "${{ inputs.backend_region }}"
-        encrypt = true
-        EOF
+bucket  = "${{ inputs.backend_bucket }}"
+key     = "${{ inputs.backend_key }}"
+region  = "${{ inputs.backend_region }}"
+encrypt = true
+EOF
 
     - name: Create backend.tf with S3 backend block
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
         cat > backend.tf <<EOF
-        terraform {
-          backend "s3" {}
-        }
-        EOF
+terraform {
+  backend "s3" {}
+}
+EOF
 
     - name: Terraform Init
       shell: bash
@@ -99,9 +107,9 @@ runs:
           || terraform workspace new "${{ inputs.tf_workspace }}"
         echo "Current workspace: $(terraform workspace show)"
 
-    - name: Run Validate
+    - name: Run Terraform Validate
       shell: bash
-      working-directory: ${{ inputs.tf_dir }} 
+      working-directory: ${{ inputs.tf_dir }}
       run: terraform validate
 
     - name: Run Terraform Command
@@ -119,7 +127,7 @@ runs:
             terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }}
             ;;
           *)
-            echo "Unknown command: ${{ inputs.tf_command }}" >&2
+            echo "❌ Unknown tf_command: ${{ inputs.tf_command }}" >&2
             exit 1
             ;;
         esac

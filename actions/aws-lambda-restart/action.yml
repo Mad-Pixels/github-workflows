@@ -63,140 +63,89 @@ runs:
           IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.image_tag }}"
         fi
         echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
     - name: Validate inputs
       shell: bash
       run: |
         set -e
-        
         if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
           echo "❌ Either aws_access_key_id or role_to_assume must be provided"
           exit 1
         fi
-        
         if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
           echo "❌ aws_secret_access_key is required when aws_access_key_id is provided"
           exit 1
         fi
-        
-        if ! command -v aws &> /dev/null; then
-          echo "❌ AWS CLI is not installed or not in PATH"
+        if ! command -v aws &>/dev/null || ! command -v jq &>/dev/null; then
+          echo "❌ AWS CLI and jq are required"
           exit 1
         fi
-        
-        if ! command -v jq &> /dev/null; then
-          echo "❌ jq is required but not found. Please install jq or use ubuntu-latest runner"
-          exit 1
-        fi
-        
         if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
           echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
-          echo "Expected: 12-digit number"
           exit 1
         fi
-        
         if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
-          echo "❌ Either image_uri or repository must be provided"
+          echo "❌ Provide either image_uri or repository"
           exit 1
         fi
-        
-        if [ -n "${{ inputs.image_uri }}" ] && [ -n "${{ inputs.repository }}" ]; then
-          echo "⚠️ Both image_uri and repository provided. Using image_uri, ignoring repository"
-        fi
-        
-        FUNCTION_NAME="${{ inputs.function_name }}"
-        if [[ ! "$FUNCTION_NAME" =~ ^[a-zA-Z0-9-_]+$ ]]; then
-          echo "❌ Invalid function name: $FUNCTION_NAME"
-          echo "Function name can only contain letters, numbers, hyphens, and underscores"
-          exit 1
-        fi
-        
-        if [ -n "${{ inputs.role_to_assume }}" ]; then
-          echo "🔐 Using OIDC authentication with role: ${{ inputs.role_to_assume }}"
-        else
-          echo "🔑 Using AWS access keys authentication"
-        fi
-        
-        echo "✅ Input validation passed"
+        echo "✅ Inputs validated"
 
-    - name: Configure AWS credentials
+    - name: Configure AWS credentials (OIDC)
+      if: inputs.role_to_assume != ''
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
         role-to-assume: ${{ inputs.role_to_assume }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Configure AWS credentials (Access Key)
+      if: inputs.role_to_assume == ''
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
         aws-region: ${{ inputs.aws_region }}
 
     - name: Validate Lambda function exists
       shell: bash
       run: |
         set -e
-        
-        echo "🔍 Checking if Lambda function exists: $FUNCTION_NAME"
-        if ! aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+        aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" >/dev/null || {
           echo "❌ Lambda function not found: $FUNCTION_NAME"
-          echo "Please check the function name and ensure it exists in region $AWS_REGION"
           exit 1
-        fi
-        
-        echo "✅ Lambda function exists: $FUNCTION_NAME"
+        }
 
     - name: Update Lambda function code
       id: update
       shell: bash
       run: |
         set -e
-        
-        echo "🚀 Updating Lambda function: $FUNCTION_NAME"
-        echo "Image URI: $IMAGE_URI"
-        
         UPDATE_RESPONSE=$(aws lambda update-function-code \
           --function-name "$FUNCTION_NAME" \
           --image-uri "$IMAGE_URI" \
           --region "$AWS_REGION" \
-          --output json \
-          --no-cli-pager)
+          --output json)
         
-        FUNCTION_ARN=$(echo "$UPDATE_RESPONSE" | jq -r '.FunctionArn')
-        LAST_MODIFIED=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')
-        CODE_SHA256=$(echo "$UPDATE_RESPONSE" | jq -r '.CodeSha256')
-        
-        echo "✅ Lambda function update initiated"
-        echo "Function ARN: $FUNCTION_ARN"
-        echo "Last Modified: $LAST_MODIFIED"
-        echo "Code SHA256: $CODE_SHA256"
-        
-        echo "function_arn=$FUNCTION_ARN" >> $GITHUB_OUTPUT
-        echo "last_modified=$LAST_MODIFIED" >> $GITHUB_OUTPUT
-        echo "code_sha256=$CODE_SHA256" >> $GITHUB_OUTPUT
+        echo "$UPDATE_RESPONSE"
+        echo "function_arn=$(echo "$UPDATE_RESPONSE" | jq -r '.FunctionArn')" >> $GITHUB_OUTPUT
+        echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" >> $GITHUB_OUTPUT
+        echo "code_sha256=$(echo "$UPDATE_RESPONSE" | jq -r '.CodeSha256')" >> $GITHUB_OUTPUT
 
     - name: Wait for update completion
-      shell: bash
       if: inputs.wait_for_update == 'true'
+      shell: bash
       run: |
-        set -e
-        
         echo "⏳ Waiting for Lambda function update to complete..."
-        echo "This may take a few minutes..."
-        
-        START_TIME=$(date +%s)
         aws lambda wait function-updated \
           --function-name "$FUNCTION_NAME" \
           --region "$AWS_REGION"
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
-        
-        echo "✅ Lambda function update completed in ${DURATION} seconds"
+        echo "✅ Update completed"
 
     - name: Summary
       shell: bash
       run: |
         echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Function Name:** $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Function ARN:** ${{ steps.update.outputs.function_arn }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Region:** $AWS_REGION" >> $GITHUB_STEP_SUMMARY
-        echo "- **Image URI:** $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
-        echo "- **Code SHA256:** ${{ steps.update.outputs.code_sha256 }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Last Modified:** ${{ steps.update.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Wait for completion:** ${{ inputs.wait_for_update }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 Lambda function successfully updated!" >> $GITHUB_STEP_SUMMARY
+        echo "- Function: $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- Image URI: $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
+        echo "- ARN: ${{ steps.update.outputs.function_arn }}" >> $GITHUB_STEP_SUMMARY
+        echo "- SHA256: ${{ steps.update.outputs.code_sha256 }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY

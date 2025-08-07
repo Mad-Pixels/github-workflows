@@ -139,7 +139,7 @@ runs:
       id: sync
       shell: bash
       run: |
-        set -eo pipefail
+        set -Eeuo pipefail
 
         SYNC="aws s3 sync \"$SOURCE_DIR\" \"$S3_URL\" --region \"$AWS_REGION\""
 
@@ -147,7 +147,8 @@ runs:
           SYNC+=" --delete"
         fi
 
-        for pattern in ${{ inputs.exclude_patterns }}; do
+        IFS=' ' read -r -a EXCLUDES <<< "${{ inputs.exclude_patterns }}"
+        for pattern in "${EXCLUDES[@]}"; do
           SYNC+=" --exclude \"$pattern\""
         done
 
@@ -161,8 +162,7 @@ runs:
 
         FILES_UPLOADED=$(echo "$OUTPUT" | grep -c "upload:" || true)
         FILES_DELETED=$(echo "$OUTPUT" | grep -c "delete:" || true)
-        SIZE=$(du -s "$SOURCE_DIR" | cut -f1)
-        BYTES=$((SIZE * 1024))
+        BYTES=$(find "$SOURCE_DIR" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
 
         echo "files_uploaded=$FILES_UPLOADED" >> $GITHUB_OUTPUT
         echo "files_deleted=$FILES_DELETED" >> $GITHUB_OUTPUT

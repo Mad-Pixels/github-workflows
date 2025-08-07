@@ -1,5 +1,5 @@
 name: ECR Push
-description: Push Docker image to AWS ECR with OIDC support and validation
+description: Push Docker image to AWS ECR (supports OIDC or access keys)
 
 inputs:
   aws_access_key_id:
@@ -13,20 +13,20 @@ inputs:
     required: true
     default: 'us-east-1'
   aws_account_id:
-    description: 'AWS account ID'
+    description: 'AWS account ID (12 digits)'
     required: true
   role_to_assume:
-    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    description: 'IAM Role ARN to assume for OIDC authentication'
     required: false
 
   repository_name:
-    description: 'ECR repository name (if different from local image name)'
+    description: 'ECR repository name (optional, defaults to image name)'
     required: false
   image:
     description: 'Local image name with tag (e.g. my-app:v1.0.0)'
     required: true
   additional_tags:
-    description: 'Additional tags to push (space-separated, e.g. "latest stable")'
+    description: 'Additional tags to push (space-separated)'
     required: false
 
 outputs:
@@ -47,163 +47,122 @@ runs:
       shell: bash
       run: |
         set -e
-        
-        if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
-          echo "❌ Either aws_access_key_id or role_to_assume must be provided"
-          exit 1
-        fi
-        
-        if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
-          echo "❌ aws_secret_access_key is required when aws_access_key_id is provided"
-          exit 1
-        fi
-        
-        if ! command -v docker &> /dev/null; then
-          echo "❌ Docker is not installed or not in PATH"
-          exit 1
-        fi
-        
-        if ! command -v aws &> /dev/null; then
-          echo "❌ AWS CLI is not installed or not in PATH"
-          exit 1
-        fi
-        
-        if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
-          echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
-          echo "Expected: 12-digit number"
-          exit 1
-        fi
-        
-        LOCAL_IMAGE="${{ inputs.image }}"
-        if [[ ! "$LOCAL_IMAGE" =~ ^.+:.+$ ]]; then
-          echo "❌ Invalid image format: $LOCAL_IMAGE"
-          echo "Expected format: name:tag (e.g. my-app:v1.0.0)"
-          exit 1
-        fi
-        
-        if ! docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
-          echo "❌ Local image not found: $LOCAL_IMAGE"
-          echo "Available images:"
-          docker images --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}"
-          exit 1
-        fi
-        
-        if [ -n "${{ inputs.role_to_assume }}" ]; then
-          echo "🔐 Using OIDC authentication with role: ${{ inputs.role_to_assume }}"
-        else
-          echo "🔑 Using AWS access keys authentication"
-        fi
-        
-        echo "✅ Input validation passed"
 
-    - name: Validate ECR repository exists
+        if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
+          echo "❌ Invalid aws_account_id: must be 12 digits"
+          exit 1
+        fi
+
+        if [[ ! "${{ inputs.image }}" =~ ^.+:.+$ ]]; then
+          echo "❌ Invalid image format: must be name:tag"
+          exit 1
+        fi
+
+        if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
+          echo "❌ Must provide either aws_access_key_id or role_to_assume"
+          exit 1
+        fi
+
+        if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
+          echo "❌ aws_secret_access_key required when using aws_access_key_id"
+          exit 1
+        fi
+
+    - name: Configure AWS credentials
+      if: ${{ inputs.aws_access_key_id != '' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Configure AWS OIDC role
+      if: ${{ inputs.role_to_assume != '' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.role_to_assume }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Check AWS identity
+      shell: bash
+      run: |
+        echo "🔐 Verifying AWS authentication"
+        aws sts get-caller-identity || {
+          echo "❌ Failed to authenticate with AWS"
+          exit 1
+        }
+
+    - name: Ensure ECR repository exists
       shell: bash
       run: |
         set -e
-        
-        LOCAL_IMAGE="${{ inputs.image }}"
-        IMAGE_NAME=$(echo "$LOCAL_IMAGE" | cut -d':' -f1)
-        
-        if [ -n "${{ inputs.repository_name }}" ]; then
-          REPO_NAME="${{ inputs.repository_name }}"
-        else
-          REPO_NAME="$IMAGE_NAME"
-        fi
-        
-        echo "🔍 Checking if ECR repository exists: $REPO_NAME"
-        if ! aws ecr describe-repositories --repository-names "$REPO_NAME" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
-          echo "❌ ECR repository not found: $REPO_NAME"
-          echo "Please create the repository first:"
-          echo "aws ecr create-repository --repository-name $REPO_NAME --region ${{ inputs.aws_region }}"
-          exit 1
-        fi
-        
-        echo "✅ ECR repository exists: $REPO_NAME"
+        IMAGE_NAME=$(echo "${{ inputs.image }}" | cut -d':' -f1)
+        REPO_NAME="${{ inputs.repository_name:-$IMAGE_NAME }}"
+        aws ecr describe-repositories \
+          --repository-names "$REPO_NAME" \
+          --region "${{ inputs.aws_region }}" >/dev/null 2>&1 || {
+            echo "❌ ECR repository not found: $REPO_NAME"
+            echo "Create it with:"
+            echo "aws ecr create-repository --repository-name $REPO_NAME"
+            exit 1
+          }
+        echo "REPO_NAME=$REPO_NAME" >> "$GITHUB_ENV"
 
     - name: Login to Amazon ECR
       shell: bash
       run: |
         set -e
-        
-        echo "🔐 Logging in to ECR..."
         ECR_REGISTRY="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+        echo "ECR_REGISTRY=$ECR_REGISTRY" >> "$GITHUB_ENV"
+        echo "🔐 Logging into $ECR_REGISTRY"
         aws ecr get-login-password --region "${{ inputs.aws_region }}" \
           | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-        
-        echo "✅ Successfully logged in to ECR"
 
-    - name: Tag and push image to ECR
+    - name: Tag and push Docker image
       id: push
       shell: bash
       run: |
         set -e
-        
+
         LOCAL_IMAGE="${{ inputs.image }}"
-        IMAGE_NAME=$(echo "$LOCAL_IMAGE" | cut -d':' -f1)
         IMAGE_TAG=$(echo "$LOCAL_IMAGE" | cut -d':' -f2)
-        
-        if [ -n "${{ inputs.repository_name }}" ]; then
-          REPO_NAME="${{ inputs.repository_name }}"
-        else
-          REPO_NAME="$IMAGE_NAME"
-        fi
-        
-        ECR_REGISTRY="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
-        ECR_REPOSITORY="$ECR_REGISTRY/$REPO_NAME"
-        PRIMARY_TAG="$ECR_REPOSITORY:$IMAGE_TAG"
-        
-        echo "🏷️ Tagging image..."
-        echo "Source: $LOCAL_IMAGE"
-        echo "Target: $PRIMARY_TAG"
-        
-        docker tag "$LOCAL_IMAGE" "$PRIMARY_TAG"
-        
-        ADDITIONAL_URIS=()
+        FULL_IMAGE_URI="$ECR_REGISTRY/$REPO_NAME:$IMAGE_TAG"
+
+        echo "🏷️ Tagging image as: $FULL_IMAGE_URI"
+        docker tag "$LOCAL_IMAGE" "$FULL_IMAGE_URI"
+        docker push "$FULL_IMAGE_URI"
+
+        IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$FULL_IMAGE_URI" | cut -d'@' -f2)
+
+        echo "✅ Primary image pushed: $FULL_IMAGE_URI"
+        echo "image_uri=$FULL_IMAGE_URI" >> "$GITHUB_OUTPUT"
+        echo "image_digest=$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+        echo "repository_uri=$ECR_REGISTRY/$REPO_NAME" >> "$GITHUB_OUTPUT"
+
         if [ -n "${{ inputs.additional_tags }}" ]; then
-          echo "🏷️ Adding additional tags..."
-          IFS=' ' read -ra ADDITIONAL_TAGS <<< "${{ inputs.additional_tags }}"
-          for tag in "${ADDITIONAL_TAGS[@]}"; do
-            ADDITIONAL_URI="$ECR_REPOSITORY:$tag"
-            echo "Additional tag: $ADDITIONAL_URI"
-            docker tag "$LOCAL_IMAGE" "$ADDITIONAL_URI"
-            ADDITIONAL_URIS+=("$ADDITIONAL_URI")
+          echo "🏷️ Pushing additional tags: ${{ inputs.additional_tags }}"
+          for tag in ${{ inputs.additional_tags }}; do
+            ALT_URI="$ECR_REGISTRY/$REPO_NAME:$tag"
+            docker tag "$LOCAL_IMAGE" "$ALT_URI"
+            docker push "$ALT_URI"
+            echo "✔️  Pushed: $ALT_URI"
           done
         fi
-        
-        echo "🚀 Pushing primary tag: $PRIMARY_TAG"
-        docker push "$PRIMARY_TAG"
-        
-        IMAGE_DIGEST=$(docker images --digests --format "{{.Digest}}" "$PRIMARY_TAG")
-        if [ ${#ADDITIONAL_URIS[@]} -gt 0 ]; then
-          echo "🚀 Pushing additional tags..."
-          for uri in "${ADDITIONAL_URIS[@]}"; do
-            echo "Pushing: $uri"
-            docker push "$uri"
-          done
-        fi
-        
-        echo "✅ All images pushed successfully!"
-        echo "Primary URI: $PRIMARY_TAG"
-        echo "Digest: $IMAGE_DIGEST"
-        
-        echo "image_uri=$PRIMARY_TAG" >> $GITHUB_OUTPUT
-        echo "image_digest=$IMAGE_DIGEST" >> $GITHUB_OUTPUT  
-        echo "repository_uri=$ECR_REPOSITORY" >> $GITHUB_OUTPUT
 
     - name: Summary
       shell: bash
       run: |
         echo "## 🐳 ECR Push Summary" >> $GITHUB_STEP_SUMMARY
         echo "- **Source Image:** ${{ inputs.image }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **ECR Repository:** ${{ steps.push.outputs.repository_uri }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Primary Image URI:** ${{ steps.push.outputs.image_uri }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **ECR Registry:** $ECR_REGISTRY" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository:** $REPO_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image URI:** ${{ steps.push.outputs.image_uri }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Image Digest:** ${{ steps.push.outputs.image_digest }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Region:** ${{ inputs.aws_region }}" >> $GITHUB_STEP_SUMMARY
-        
+
         if [ -n "${{ inputs.additional_tags }}" ]; then
           echo "- **Additional Tags:** ${{ inputs.additional_tags }}" >> $GITHUB_STEP_SUMMARY
         fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 Image successfully pushed to ECR!" >> $GITHUB_STEP_SUMMARY
 
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Successfully pushed image to ECR" >> $GITHUB_STEP_SUMMARY
