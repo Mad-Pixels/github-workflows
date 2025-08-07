@@ -31,7 +31,7 @@ inputs:
     description: 'Terraform version'
     required: false
     default: '1.6.1'
-  
+
   backend_bucket:
     description: 'S3 bucket for state'
     required: true
