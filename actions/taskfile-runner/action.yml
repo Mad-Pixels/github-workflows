@@ -1,48 +1,46 @@
 name: Task Runner
 
-description: Run Taskfile command with optional Go setup and environment variables
+description: Run Taskfile command from container with Docker socket passthrough
 
 inputs:
   go_dir:
-    description: "Working directory for Go project"
+    description: "Working directory inside the project"
     required: false
-    default: "./"
-  go_version:
-    description: "Go version"
-    required: false
-    default: "1.24"
+    default: "."
   command:
     description: "Task command to run"
     required: true
   vars:
     description: "Optional environment variables in format key:value,key:value"
     required: false
+  image:
+    description: "Task image"
+    required: false
+    default: "ghcr.io/mad-pixels/images/taskfile:3.44.1"
 
 runs:
   using: "composite"
   steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: ${{ inputs.go_version }}
-
-    - name: Install Task
-      shell: bash
-      run: |
-        sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
-
-    - name: Export VARS as env
+    - name: Parse and export env
       if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
+        echo "DOCKER_ENV=" >> $GITHUB_OUTPUT
         echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
           echo "$key=$value" >> $GITHUB_ENV
+          echo "--env $key=$value" >> $GITHUB_OUTPUT
         done
 
-    - name: Run Task
+    - name: Run Task inside Docker
       shell: bash
-      working-directory: ${{ inputs.go_dir }}
-      run: task ${{ inputs.command }}
+      run: |
+        docker run --rm \
+          -v "$PWD:/work" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -w "/work/${{ inputs.go_dir }}" \
+          ${{ steps.parse-and-export-env.outputs.DOCKER_ENV }} \
+          ${{ inputs.image }} \
+          ${{ inputs.command }}

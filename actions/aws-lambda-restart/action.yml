@@ -1,54 +1,202 @@
 name: Lambda Restart
-
 description: Update AWS Lambda function with latest container image from ECR
 
 inputs:
   aws_access_key_id:
-    description: 'AWS access key ID'
-    required: true
+    description: 'AWS access key ID (optional if using OIDC)'
+    required: false
   aws_secret_access_key:
-    description: 'AWS secret access key'
-    required: true
+    description: 'AWS secret access key (optional if using OIDC)'
+    required: false
   aws_region:
     description: 'AWS region'
     required: true
+    default: 'us-east-1'
   aws_account_id:
     description: 'AWS account ID'
     required: true
+  role_to_assume:
+    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    required: false
 
-  function:
-    description: 'Lambda function name (suffix only, e.g. api-schema)'
+  function_name:
+    description: 'Full Lambda function name'
     required: true
+  image_uri:
+    description: 'Full ECR image URI (if provided, takes precedence over repository/tag)'
+    required: false
   repository:
     description: 'ECR repository name'
-    required: true
+    required: false
+  image_tag:
+    description: 'ECR image tag'
+    required: false
+    default: 'latest'
+  wait_for_update:
+    description: 'Wait for function update to complete'
+    required: false
+    default: 'true'
+
+outputs:
+  function_arn:
+    description: 'Lambda function ARN'
+    value: ${{ steps.update.outputs.function_arn }}
+  last_modified:
+    description: 'Function last modified timestamp'
+    value: ${{ steps.update.outputs.last_modified }}
+  code_sha256:
+    description: 'Function code SHA256'
+    value: ${{ steps.update.outputs.code_sha256 }}
 
 runs:
   using: "composite"
   steps:
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
-        aws-region: ${{ inputs.aws_region }}
-
-    - name: Update Lambda function code from ECR
+    - name: Set environment variables
       shell: bash
       run: |
-        IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.function }}"
-        FUNCTION_NAME="applingo-${{ inputs.function }}"
+        echo "FUNCTION_NAME=${{ inputs.function_name }}" >> $GITHUB_ENV
+        echo "AWS_REGION=${{ inputs.aws_region }}" >> $GITHUB_ENV
+        
+        if [ -n "${{ inputs.image_uri }}" ]; then
+          IMAGE_URI="${{ inputs.image_uri }}"
+        else
+          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.image_tag }}"
+        fi
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -e
+        
+        if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
+          echo "❌ Either aws_access_key_id or role_to_assume must be provided"
+          exit 1
+        fi
+        
+        if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
+          echo "❌ aws_secret_access_key is required when aws_access_key_id is provided"
+          exit 1
+        fi
+        
+        if ! command -v aws &> /dev/null; then
+          echo "❌ AWS CLI is not installed or not in PATH"
+          exit 1
+        fi
+        
+        if ! command -v jq &> /dev/null; then
+          echo "❌ jq is required but not found. Please install jq or use ubuntu-latest runner"
+          exit 1
+        fi
+        
+        if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
+          echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
+          echo "Expected: 12-digit number"
+          exit 1
+        fi
+        
+        if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
+          echo "❌ Either image_uri or repository must be provided"
+          exit 1
+        fi
+        
+        if [ -n "${{ inputs.image_uri }}" ] && [ -n "${{ inputs.repository }}" ]; then
+          echo "⚠️ Both image_uri and repository provided. Using image_uri, ignoring repository"
+        fi
+        
+        FUNCTION_NAME="${{ inputs.function_name }}"
+        if [[ ! "$FUNCTION_NAME" =~ ^[a-zA-Z0-9-_]+$ ]]; then
+          echo "❌ Invalid function name: $FUNCTION_NAME"
+          echo "Function name can only contain letters, numbers, hyphens, and underscores"
+          exit 1
+        fi
+        
+        if [ -n "${{ inputs.role_to_assume }}" ]; then
+          echo "🔐 Using OIDC authentication with role: ${{ inputs.role_to_assume }}"
+        else
+          echo "🔑 Using AWS access keys authentication"
+        fi
+        
+        echo "✅ Input validation passed"
 
-        echo "Updating Lambda function $FUNCTION_NAME with image: $IMAGE_URI"
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        role-to-assume: ${{ inputs.role_to_assume }}
+        aws-region: ${{ inputs.aws_region }}
 
-        aws lambda update-function-code \
+    - name: Validate Lambda function exists
+      shell: bash
+      run: |
+        set -e
+        
+        echo "🔍 Checking if Lambda function exists: $FUNCTION_NAME"
+        if ! aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+          echo "❌ Lambda function not found: $FUNCTION_NAME"
+          echo "Please check the function name and ensure it exists in region $AWS_REGION"
+          exit 1
+        fi
+        
+        echo "✅ Lambda function exists: $FUNCTION_NAME"
+
+    - name: Update Lambda function code
+      id: update
+      shell: bash
+      run: |
+        set -e
+        
+        echo "🚀 Updating Lambda function: $FUNCTION_NAME"
+        echo "Image URI: $IMAGE_URI"
+        
+        UPDATE_RESPONSE=$(aws lambda update-function-code \
           --function-name "$FUNCTION_NAME" \
           --image-uri "$IMAGE_URI" \
-          --region "${{ inputs.aws_region }}" \
-          --no-cli-pager
+          --region "$AWS_REGION" \
+          --output json \
+          --no-cli-pager)
+        
+        FUNCTION_ARN=$(echo "$UPDATE_RESPONSE" | jq -r '.FunctionArn')
+        LAST_MODIFIED=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')
+        CODE_SHA256=$(echo "$UPDATE_RESPONSE" | jq -r '.CodeSha256')
+        
+        echo "✅ Lambda function update initiated"
+        echo "Function ARN: $FUNCTION_ARN"
+        echo "Last Modified: $LAST_MODIFIED"
+        echo "Code SHA256: $CODE_SHA256"
+        
+        echo "function_arn=$FUNCTION_ARN" >> $GITHUB_OUTPUT
+        echo "last_modified=$LAST_MODIFIED" >> $GITHUB_OUTPUT
+        echo "code_sha256=$CODE_SHA256" >> $GITHUB_OUTPUT
 
+    - name: Wait for update completion
+      shell: bash
+      if: inputs.wait_for_update == 'true'
+      run: |
+        set -e
+        
+        echo "⏳ Waiting for Lambda function update to complete..."
+        echo "This may take a few minutes..."
+        
+        START_TIME=$(date +%s)
         aws lambda wait function-updated \
           --function-name "$FUNCTION_NAME" \
-          --region "${{ inputs.aws_region }}"
+          --region "$AWS_REGION"
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        
+        echo "✅ Lambda function update completed in ${DURATION} seconds"
 
-        echo "Lambda function $FUNCTION_NAME has been updated successfully."
+    - name: Summary
+      shell: bash
+      run: |
+        echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Function Name:** $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Function ARN:** ${{ steps.update.outputs.function_arn }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Region:** $AWS_REGION" >> $GITHUB_STEP_SUMMARY
+        echo "- **Image URI:** $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
+        echo "- **Code SHA256:** ${{ steps.update.outputs.code_sha256 }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Last Modified:** ${{ steps.update.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Wait for completion:** ${{ inputs.wait_for_update }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 Lambda function successfully updated!" >> $GITHUB_STEP_SUMMARY
