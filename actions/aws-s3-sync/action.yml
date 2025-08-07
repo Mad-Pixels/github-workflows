@@ -14,7 +14,6 @@ inputs:
   aws_region:
     description: 'AWS region'
     required: true
-    default: 'us-east-1'
   bucket_name:
     description: 'Target S3 bucket name'
     required: true
@@ -83,18 +82,18 @@ runs:
       run: |
         set -eo pipefail
 
-        if [[ ! "$BUCKET_NAME" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
-          echo "❌ Invalid S3 bucket name: $BUCKET_NAME"
+        if [[ ! "${{ inputs.bucket_name }}" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
+          echo "❌ Invalid S3 bucket name: ${{ inputs.bucket_name }}"
           exit 1
         fi
 
-        if [[ ! -d "$SOURCE_DIR" ]]; then
-          echo "❌ Source directory not found: $SOURCE_DIR"
+        if [[ ! -d "${{ inputs.source_dir }}" ]]; then
+          echo "❌ Source directory not found: ${{ inputs.source_dir }}"
           exit 1
         fi
 
-        if [[ -z "$(find "$SOURCE_DIR" -type f -print -quit)" ]]; then
-          echo "❌ Source directory is empty: $SOURCE_DIR"
+        if [[ -z "$(find "${{ inputs.source_dir }}" -type f -print -quit)" ]]; then
+          echo "❌ Source directory is empty: ${{ inputs.source_dir }}"
           exit 1
         fi
 
@@ -112,8 +111,8 @@ runs:
       shell: bash
       run: |
         set -eo pipefail
-        aws s3 ls "s3://$BUCKET_NAME" --region "$AWS_REGION" >/dev/null || {
-          echo "❌ Cannot access S3 bucket: $BUCKET_NAME"
+        aws s3 ls "s3://${{ inputs.bucket_name }}" --region "${{ inputs.aws_region }}" >/dev/null || {
+          echo "❌ Cannot access S3 bucket: ${{ inputs.bucket_name }}"
           exit 1
         }
         echo "✅ Access to S3 confirmed"
@@ -124,28 +123,40 @@ runs:
       run: |
         set -Eeuo pipefail
 
-        SYNC="aws s3 sync \"$SOURCE_DIR\" \"$S3_URL\" --region \"$AWS_REGION\""
+        BUCKET="${{ inputs.bucket_name }}"
+        PREFIX="${{ inputs.bucket_prefix }}"
+        REGION="${{ inputs.aws_region }}"
+        SOURCE="${{ inputs.source_dir }}"
+        CACHE_CONTROL="${{ inputs.cache_control }}"
+        DELETE="${{ inputs.delete_removed }}"
+        EXCLUDES="${{ inputs.exclude_patterns }}"
 
-        if [[ "${{ inputs.delete_removed }}" == "true" ]]; then
-          SYNC+=" --delete"
+        PREFIX="${PREFIX#/}"
+        PREFIX="${PREFIX%/}"
+        [[ -n "$PREFIX" ]] && S3_URL="s3://$BUCKET/$PREFIX" || S3_URL="s3://$BUCKET"
+
+        SYNC_CMD=(aws s3 sync "$SOURCE" "$S3_URL" --region "$REGION")
+
+        if [[ "$DELETE" == "true" ]]; then
+          SYNC_CMD+=("--delete")
         fi
 
-        IFS=' ' read -r -a EXCLUDES <<< "${{ inputs.exclude_patterns }}"
-        for pattern in "${EXCLUDES[@]}"; do
-          SYNC+=" --exclude \"$pattern\""
+        IFS=' ' read -r -a patterns <<< "$EXCLUDES"
+        for pattern in "${patterns[@]}"; do
+          SYNC_CMD+=("--exclude" "$pattern")
         done
 
-        if [[ -n "${{ inputs.cache_control }}" ]]; then
-          SYNC+=" --cache-control \"${{ inputs.cache_control }}\""
+        if [[ -n "$CACHE_CONTROL" ]]; then
+          SYNC_CMD+=("--cache-control" "$CACHE_CONTROL")
         fi
 
-        echo "🔄 Executing: $SYNC"
-        OUTPUT=$(bash -c "$SYNC" 2>&1)
+        echo "🔄 Executing: ${SYNC_CMD[*]}"
+        OUTPUT=$("${SYNC_CMD[@]}" 2>&1)
         echo "$OUTPUT"
 
         FILES_UPLOADED=$(echo "$OUTPUT" | grep -c "upload:" || true)
         FILES_DELETED=$(echo "$OUTPUT" | grep -c "delete:" || true)
-        BYTES=$(find "$SOURCE_DIR" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
+        BYTES=$(find "$SOURCE" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
 
         echo "files_uploaded=$FILES_UPLOADED" >> $GITHUB_OUTPUT
         echo "files_deleted=$FILES_DELETED" >> $GITHUB_OUTPUT
@@ -155,9 +166,9 @@ runs:
     - name: Summary
       shell: bash
       run: |
-        echo "## ☁️ Sync Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- Bucket: $BUCKET_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- Path: $SOURCE_DIR → ${{ steps.sync.outputs.s3_url }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Files uploaded: ${{ steps.sync.outputs.files_uploaded }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Files deleted: ${{ steps.sync.outputs.files_deleted }}" >> $GITHUB_STEP_SUMMARY
-        echo "- Total size: ${{ steps.sync.outputs.total_size }} bytes" >> $GITHUB_STEP_SUMMARY
+        echo "## ☁️ Sync Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Bucket: ${{ inputs.bucket_name }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Path: ${{ inputs.source_dir }} → ${{ steps.sync.outputs.s3_url }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Files uploaded: ${{ steps.sync.outputs.files_uploaded }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Files deleted: ${{ steps.sync.outputs.files_deleted }}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Total size: ${{ steps.sync.outputs.total_size }} bytes" >> "$GITHUB_STEP_SUMMARY"
