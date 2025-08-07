@@ -38,8 +38,9 @@ runs:
       shell: bash
       run: |
         docker run --rm \
+          --entrypoint /bin/sh \
           -v "$PWD:/work" \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -w "/work/${{ inputs.go_dir }}" \
           ${{ inputs.image }} \
-          /bin/sh -c "git config --global --add safe.directory /work && task ${{ inputs.command }}"
+          -c "git config --global --add safe.directory /work && task ${{ inputs.command }}"
