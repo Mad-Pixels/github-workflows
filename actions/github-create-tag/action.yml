@@ -1,3 +1,4 @@
+---
 name: 'Tag Creator'
 description: 'Create and manage git tags with validation'
 
@@ -15,7 +16,7 @@ inputs:
   branch:
     description: 'Branch to tag from'
     required: false
-    default: 'main'  
+    default: 'main'
   tag_format:
     description: 'Tag format validation regex'
     required: false
@@ -101,7 +102,8 @@ runs:
         set -euo pipefail
 
         TAG_EXISTS=false
-        if git rev-parse "$TAG_NAME" >/dev/null 2>&1 || git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+        if git rev-parse "$TAG_NAME" >/dev/null 2>&1 || \
+           git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
           TAG_EXISTS=true
           if [ "$FORCE_CREATE" != "true" ]; then
             echo "❌ Tag $TAG_NAME already exists. Use 'force: true' to overwrite"
@@ -126,7 +128,8 @@ runs:
 
         COMMIT_SHA=$(git rev-parse HEAD)
         echo "tag_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-        echo "tag_url=https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "tag_url=https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME" \
+          >> $GITHUB_OUTPUT
 
         echo "🏷️ Tag: $TAG_NAME"
         echo "📌 Commit: $COMMIT_SHA"
@@ -179,9 +182,12 @@ runs:
         echo "- **Tag:** $TAG_NAME" >> $GITHUB_STEP_SUMMARY
         echo "- **SHA:** ${{ steps.create_tag.outputs.tag_sha }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Branch:** $BRANCH_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Type:** $([ "$LIGHTWEIGHT" = "true" ] && echo "Lightweight" || echo "Annotated")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Type:** $(
+          [ "$LIGHTWEIGHT" = "true" ] && echo "Lightweight" || echo "Annotated"
+        )" >> $GITHUB_STEP_SUMMARY
         echo "- **Force:** $FORCE_CREATE" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})" \
+          >> $GITHUB_STEP_SUMMARY
 
         if [ -n "$TAG_MESSAGE" ]; then
           echo "- **Message:** $TAG_MESSAGE" >> $GITHUB_STEP_SUMMARY

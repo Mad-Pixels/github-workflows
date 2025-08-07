@@ -1,3 +1,4 @@
+---
 name: Sync Directory to S3
 description: Uploads a local directory to S3 with optional prefix, deletion, and headers
 
@@ -158,7 +159,6 @@ runs:
         FILES_DELETED=$(echo "$OUTPUT" | grep -c "delete:" || true)
         BYTES=$(find "$SOURCE" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
         MB=$(awk "BEGIN {printf \"%.2f\", $BYTES/1024/1024}")
-        
         echo "files_uploaded=$FILES_UPLOADED" >> $GITHUB_OUTPUT
         echo "files_deleted=$FILES_DELETED" >> $GITHUB_OUTPUT
         echo "total_size_mb=$MB" >> $GITHUB_OUTPUT

@@ -1,3 +1,4 @@
+---
 name: 'Terraform Runner'
 description: 'Invoke terraform actions'
 
@@ -111,25 +112,26 @@ runs:
       run: |
         case "${{ inputs.tf_command }}" in
           plan)
-            terraform plan -input=false ${{ inputs.tf_vars }} || exit 1
+            terraform plan -input=false ${{ inputs.tf_vars }}
             ;;
           apply)
-            terraform apply -input=false -auto-approve ${{ inputs.tf_vars }} || exit 1
+            terraform apply -input=false -auto-approve ${{ inputs.tf_vars }}
             ;;
           destroy)
-            terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }} || exit 1
+            terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }}
             ;;
           *)
             echo "❌ Unknown tf_command: ${{ inputs.tf_command }}" >&2
             exit 1
             ;;
         esac
-    
     - name: Terraform Summary
       shell: bash
       run: |
+        WORKSPACE="${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}"
+
         echo "## 🛠️ Terraform Execution Summary" >> "$GITHUB_STEP_SUMMARY"
         echo "- Command: \`${{ inputs.tf_command }}\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Directory: \`${{ inputs.tf_dir }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Workspace: \`${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Workspace: \`$WORKSPACE\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Terraform version: \`${{ inputs.tf_version }}\`" >> "$GITHUB_STEP_SUMMARY"

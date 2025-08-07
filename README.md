@@ -181,9 +181,10 @@ _docker/run:
       --security-opt no-new-privileges \
       --user $(id -u):$(id -g) \
       --workdir /workspace \
+      {{if .ENVS}}{{range $env := .ENVS}}--env {{$env}} {{end}}{{end}}\
+      {{if .PORTS}}{{range $port := .PORTS}}--publish {{$port}} {{end}}{{end}}\
+      {{if .VOLUMES}}{{range $vol := .VOLUMES}}--volume {{$vol}} {{end}}{{end}}\
       --volume "{{.git_root}}/{{.MOUNT_DIR}}:/workspace:rw" \
-      {{if .ENVS}}{{range $env := .ENVS}}--env {{$env}} {{end}}{{end}} \
-      {{if .PORTS}}{{range $port := .PORTS}}--publish {{$port}} {{end}}{{end}} \
       {{.IMAGE}} \
       {{.CMD}}
   requires:

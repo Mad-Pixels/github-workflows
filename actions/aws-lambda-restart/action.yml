@@ -1,3 +1,4 @@
+---
 name: Lambda Restart
 description: Update AWS Lambda function with latest container image from ECR
 
@@ -55,11 +56,12 @@ runs:
       run: |
         echo "FUNCTION_NAME=${{ inputs.function_name }}" >> $GITHUB_ENV
         echo "AWS_REGION=${{ inputs.aws_region }}" >> $GITHUB_ENV
-        
+
         if [ -n "${{ inputs.image_uri }}" ]; then
           IMAGE_URI="${{ inputs.image_uri }}"
         else
-          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.image_tag }}"
+          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+          IMAGE_URI="$IMAGE_URI/${{ inputs.repository }}:${{ inputs.image_tag }}"
         fi
         echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
@@ -67,22 +69,22 @@ runs:
       shell: bash
       run: |
         set -e
-        
+
         if ! command -v aws &>/dev/null || ! command -v jq &>/dev/null; then
           echo "❌ AWS CLI and jq are required"
           exit 1
         fi
-        
+
         if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
           echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
           exit 1
         fi
-        
+
         if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
           echo "❌ Provide either image_uri or repository"
           exit 1
         fi
-        
+
         echo "✅ Inputs validated"
 
     - name: Configure AWS authentication
@@ -97,10 +99,12 @@ runs:
       shell: bash
       run: |
         set -e
-        aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" >/dev/null || {
-          echo "❌ Lambda function not found: $FUNCTION_NAME"
-          exit 1
-        }
+        aws lambda get-function \
+          --function-name "$FUNCTION_NAME" \
+          --region "$AWS_REGION" >/dev/null || {
+            echo "❌ Lambda function not found: $FUNCTION_NAME"
+            exit 1
+          }
 
     - name: Update Lambda function code
       id: update
@@ -112,9 +116,10 @@ runs:
           --image-uri "$IMAGE_URI" \
           --region "$AWS_REGION" \
           --output json)
-        
+
         echo "$UPDATE_RESPONSE"
-        echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" >> $GITHUB_OUTPUT
+        echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" \
+          >> $GITHUB_OUTPUT
 
     - name: Wait for update completion
       if: inputs.wait_for_update == 'true'
@@ -132,4 +137,5 @@ runs:
         echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
         echo "- Function: $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
         echo "- Image URI: $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
-        echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" \
+          >> $GITHUB_STEP_SUMMARY

@@ -1,3 +1,4 @@
+---
 name: 'Branch Validator'
 description: 'Verify that tag or commit is reachable from specified branch (default: main)'
 
@@ -22,7 +23,7 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  
+        fetch-depth: 0
 
     - name: Validate branch ancestry
       id: validate

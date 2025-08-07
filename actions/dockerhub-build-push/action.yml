@@ -1,3 +1,4 @@
+---
 name: DockerHub Push
 description: Build and push multi-platform Docker images to DockerHub.
 
@@ -50,7 +51,8 @@ runs:
       run: |
         if [[ -n "${{ inputs.artifact_name }}" ]]; then
           echo "using_artifact=true" >> "$GITHUB_OUTPUT"
-          echo "context=./artifact/${{ inputs.context_path }}" >> "$GITHUB_OUTPUT"
+          ctx_path="./artifact/${{ inputs.context_path }}"
+          echo "context=$ctx_path" >> "$GITHUB_OUTPUT"
         else
           echo "using_artifact=false" >> "$GITHUB_OUTPUT"
           echo "context=${{ inputs.context_path }}" >> "$GITHUB_OUTPUT"
@@ -93,7 +95,10 @@ runs:
         BUILD_ARGS=""
         if [[ "${{ inputs.build_args }}" != "{}" ]]; then
           echo "🔧 Parsing build args..."
-          echo '${{ inputs.build_args }}' | jq -r 'to_entries[] | "--build-arg \(.key)=\(.value)"' | while read -r arg; do
+          echo '${{ inputs.build_args }}' | jq -r '
+            to_entries[] |
+            "--build-arg \(.key)=\(.value)"
+          ' | while read -r arg; do
             BUILD_ARGS="$BUILD_ARGS $arg"
           done
         fi
@@ -110,14 +115,17 @@ runs:
     - name: Docker Build Summary
       shell: bash
       run: |
+        CONTEXT="${{ steps.ctx.outputs.context }}"
+        DOCKERFILE_PATH="${CONTEXT}/${{ inputs.dockerfile_path }}"
+
         echo "## 🐳 Docker Image Summary" >> "$GITHUB_STEP_SUMMARY"
         echo "- Repository: \`${{ inputs.repository }}\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Tags:" >> "$GITHUB_STEP_SUMMARY"
         echo "  - \`${{ inputs.repository }}:${{ inputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
         echo "  - \`${{ inputs.repository }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Platforms: \`${{ inputs.platforms }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Context: \`${{ steps.ctx.outputs.context }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Dockerfile: \`${{ steps.ctx.outputs.context }}/${{ inputs.dockerfile_path }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Context: \`${CONTEXT}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Dockerfile: \`${DOCKERFILE_PATH}\`" >> "$GITHUB_STEP_SUMMARY"
 
         if [[ "${{ inputs.build_args }}" != "{}" ]]; then
           echo "- Build args:" >> "$GITHUB_STEP_SUMMARY"
