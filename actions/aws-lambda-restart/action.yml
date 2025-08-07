@@ -68,42 +68,31 @@ runs:
       shell: bash
       run: |
         set -e
-        if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
-          echo "❌ Either aws_access_key_id or role_to_assume must be provided"
-          exit 1
-        fi
-        if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
-          echo "❌ aws_secret_access_key is required when aws_access_key_id is provided"
-          exit 1
-        fi
+        
         if ! command -v aws &>/dev/null || ! command -v jq &>/dev/null; then
           echo "❌ AWS CLI and jq are required"
           exit 1
         fi
+        
         if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
           echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
           exit 1
         fi
+        
         if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
           echo "❌ Provide either image_uri or repository"
           exit 1
         fi
+        
         echo "✅ Inputs validated"
 
-    - name: Configure AWS credentials (OIDC)
-      if: inputs.role_to_assume != ''
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Configure AWS authentication
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@dev3
       with:
-        role-to-assume: ${{ inputs.role_to_assume }}
-        aws-region: ${{ inputs.aws_region }}
-
-    - name: Configure AWS credentials (Access Key)
-      if: inputs.role_to_assume == ''
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
-        aws-region: ${{ inputs.aws_region }}
+        aws_access_key: ${{ inputs.aws_access_key_id }}
+        aws_secret_key: ${{ inputs.aws_secret_access_key }}
+        role_to_assume: ${{ inputs.role_to_assume }}
+        aws_region: ${{ inputs.aws_region }}
 
     - name: Validate Lambda function exists
       shell: bash

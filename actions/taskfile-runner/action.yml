@@ -63,4 +63,3 @@ runs:
       run: |
         echo "🚀 Running task ${{ inputs.command }}"
         task ${{ inputs.command }}
-

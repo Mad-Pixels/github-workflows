@@ -58,39 +58,15 @@ runs:
           exit 1
         fi
 
-        if [ -z "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
-          echo "❌ Must provide either aws_access_key_id or role_to_assume"
-          exit 1
-        fi
+        echo "✅ Input validation passed"
 
-        if [ -n "${{ inputs.aws_access_key_id }}" ] && [ -z "${{ inputs.aws_secret_access_key }}" ]; then
-          echo "❌ aws_secret_access_key required when using aws_access_key_id"
-          exit 1
-        fi
-
-    - name: Configure AWS credentials
-      if: ${{ inputs.aws_access_key_id != '' }}
-      uses: aws-actions/configure-aws-credentials@v4
+    - name: Configure AWS authentication
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@dev3
       with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
-        aws-region: ${{ inputs.aws_region }}
-
-    - name: Configure AWS OIDC role
-      if: ${{ inputs.role_to_assume != '' }}
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ inputs.role_to_assume }}
-        aws-region: ${{ inputs.aws_region }}
-
-    - name: Check AWS identity
-      shell: bash
-      run: |
-        echo "🔐 Verifying AWS authentication"
-        aws sts get-caller-identity || {
-          echo "❌ Failed to authenticate with AWS"
-          exit 1
-        }
+        aws_access_key: ${{ inputs.aws_access_key_id }}
+        aws_secret_key: ${{ inputs.aws_secret_access_key }}
+        role_to_assume: ${{ inputs.role_to_assume }}
+        aws_region: ${{ inputs.aws_region }}
 
     - name: Ensure ECR repository exists
       shell: bash
