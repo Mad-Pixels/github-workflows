@@ -1,0 +1,52 @@
+version: '3'
+
+vars:
+  git_root:
+    sh: git rev-parse --show-toplevel
+
+  actionlint_version: "1.7.7"
+
+tasks:
+  default:
+    desc: Default task.
+    cmds:
+      - echo "Please enter a task or use '-l' or '--list-all' to list all available tasks"
+    silent: true
+
+# ================================================#
+# ---------------------INTERNAL-------------------#
+# ================================================#
+
+  _docker/run:
+    internal: true
+    silent: true
+    dir: "{{.git_root}}"
+    cmd: |
+      docker run --rm --init {{if .TTY}}-it{{end}} \
+        --cap-drop=ALL \
+        --security-opt no-new-privileges \
+        --user $(id -u):$(id -g) \
+        --workdir /workspace \
+        {{if .ENVS}}{{range $env := .ENVS}}--env {{$env}} {{end}}{{end}}\
+        {{if .PORTS}}{{range $port := .PORTS}}--publish {{$port}} {{end}}{{end}}\
+        {{if .VOLUMES}}{{range $vol := .VOLUMES}}--volume {{$vol}} {{end}}{{end}}\
+        --volume "{{.git_root}}/{{.MOUNT_DIR}}:/workspace:rw" \
+        {{.IMAGE}} \
+        {{.CMD}}
+    requires:
+      vars: [IMAGE, CMD, MOUNT_DIR]
+
+# ================================================#
+# ----------------------CI/CD---------------------#
+# ================================================#
+
+  yamllint:
+    desc: Run yamllint with auto-fix where possible.
+    silent: true
+    cmds:
+      - task: _docker/run
+        vars:
+          IMAGE: "cytopia/yamllint"
+          CMD: "-c /workspace/.yamllint.yml /workspace/actions/"
+          MOUNT_DIR: "."
+    

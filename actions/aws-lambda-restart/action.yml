@@ -1,0 +1,141 @@
+---
+name: Lambda Restart
+description: Update AWS Lambda function with latest container image from ECR
+
+inputs:
+  aws_access_key_id:
+    description: 'AWS access key ID (optional if using OIDC)'
+    required: false
+  aws_secret_access_key:
+    description: 'AWS secret access key (optional if using OIDC)'
+    required: false
+  aws_region:
+    description: 'AWS region'
+    required: true
+  aws_account_id:
+    description: 'AWS account ID'
+    required: true
+  role_to_assume:
+    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    required: false
+
+  function_name:
+    description: 'Full Lambda function name'
+    required: true
+  image_uri:
+    description: 'Full ECR image URI (if provided, takes precedence over repository/tag)'
+    required: false
+  repository:
+    description: 'ECR repository name'
+    required: false
+  image_tag:
+    description: 'ECR image tag'
+    required: false
+    default: 'latest'
+  wait_for_update:
+    description: 'Wait for function update to complete'
+    required: false
+    default: 'true'
+
+outputs:
+  function_arn:
+    description: 'Lambda function ARN'
+    value: ${{ steps.update.outputs.function_arn }}
+  last_modified:
+    description: 'Function last modified timestamp'
+    value: ${{ steps.update.outputs.last_modified }}
+  code_sha256:
+    description: 'Function code SHA256'
+    value: ${{ steps.update.outputs.code_sha256 }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set environment variables
+      shell: bash
+      run: |
+        echo "FUNCTION_NAME=${{ inputs.function_name }}" >> $GITHUB_ENV
+        echo "AWS_REGION=${{ inputs.aws_region }}" >> $GITHUB_ENV
+
+        if [ -n "${{ inputs.image_uri }}" ]; then
+          IMAGE_URI="${{ inputs.image_uri }}"
+        else
+          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+          IMAGE_URI="$IMAGE_URI/${{ inputs.repository }}:${{ inputs.image_tag }}"
+        fi
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -e
+
+        if ! command -v aws &>/dev/null || ! command -v jq &>/dev/null; then
+          echo "❌ AWS CLI and jq are required"
+          exit 1
+        fi
+
+        if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
+          echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
+          exit 1
+        fi
+
+        if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
+          echo "❌ Provide either image_uri or repository"
+          exit 1
+        fi
+
+        echo "✅ Inputs validated"
+
+    - name: Configure AWS authentication
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      with:
+        aws_access_key: ${{ inputs.aws_access_key_id }}
+        aws_secret_key: ${{ inputs.aws_secret_access_key }}
+        role_to_assume: ${{ inputs.role_to_assume }}
+        aws_region: ${{ inputs.aws_region }}
+
+    - name: Validate Lambda function exists
+      shell: bash
+      run: |
+        set -e
+        aws lambda get-function \
+          --function-name "$FUNCTION_NAME" \
+          --region "$AWS_REGION" >/dev/null || {
+            echo "❌ Lambda function not found: $FUNCTION_NAME"
+            exit 1
+          }
+
+    - name: Update Lambda function code
+      id: update
+      shell: bash
+      run: |
+        set -e
+        UPDATE_RESPONSE=$(aws lambda update-function-code \
+          --function-name "$FUNCTION_NAME" \
+          --image-uri "$IMAGE_URI" \
+          --region "$AWS_REGION" \
+          --output json)
+
+        echo "$UPDATE_RESPONSE"
+        echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" \
+          >> $GITHUB_OUTPUT
+
+    - name: Wait for update completion
+      if: inputs.wait_for_update == 'true'
+      shell: bash
+      run: |
+        echo "⏳ Waiting for Lambda function update to complete..."
+        aws lambda wait function-updated \
+          --function-name "$FUNCTION_NAME" \
+          --region "$AWS_REGION"
+        echo "✅ Update completed"
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- Function: $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- Image URI: $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
+        echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" \
+          >> $GITHUB_STEP_SUMMARY

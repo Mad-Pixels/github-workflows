@@ -1,0 +1,65 @@
+---
+name: 'Branch Validator'
+description: 'Verify that tag or commit is reachable from specified branch (default: main)'
+
+inputs:
+  target_branch:
+    description: 'Branch to validate against (e.g., main or release/v1)'
+    required: false
+    default: 'main'
+  tag_name:
+    description: 'Tag name to validate (if empty, uses current HEAD)'
+    required: false
+    default: ''
+
+outputs:
+  is_valid:
+    description: 'true if commit is from target branch, false otherwise'
+    value: ${{ steps.validate.outputs.is_valid }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Validate branch ancestry
+      id: validate
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        TARGET_BRANCH="${{ inputs.target_branch }}"
+        TAG_NAME="${{ inputs.tag_name }}"
+
+        echo "🔍 Validating commit against branch: $TARGET_BRANCH"
+
+        if [ -n "$TAG_NAME" ]; then
+          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "❌ Tag '$TAG_NAME' does not exist"
+            echo "is_valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          COMMIT=$(git rev-list -n 1 "$TAG_NAME")
+          echo "📦 Using tag '$TAG_NAME' → commit $COMMIT"
+        else
+          COMMIT=$(git rev-parse HEAD)
+          echo "📦 Using HEAD → commit $COMMIT"
+        fi
+
+        if ! git show-ref --verify --quiet "refs/remotes/origin/$TARGET_BRANCH"; then
+          echo "❌ Remote branch 'origin/$TARGET_BRANCH' not found"
+          echo "is_valid=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+        if git merge-base --is-ancestor "$COMMIT" "origin/$TARGET_BRANCH"; then
+          echo "✅ Commit $COMMIT is reachable from branch '$TARGET_BRANCH'"
+          echo "is_valid=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Commit $COMMIT is NOT reachable from branch '$TARGET_BRANCH'"
+          echo "is_valid=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
