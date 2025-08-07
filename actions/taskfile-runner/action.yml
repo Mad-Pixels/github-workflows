@@ -5,16 +5,13 @@ inputs:
   command:
     description: 'Task command to run (e.g. "build" or "lint")'
     required: true
-
   vars:
     description: 'Optional environment variables in format key:value,key:value'
     required: false
-
   dir:
     description: 'Working directory inside the project'
     required: false
     default: '.'
-
   version:
     description: 'Task binary version to use'
     required: false

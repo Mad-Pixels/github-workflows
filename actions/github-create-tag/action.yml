@@ -8,7 +8,6 @@ inputs:
   token:
     description: 'GitHub token for authentication'
     required: true
-
   force:
     description: 'Force overwrite existing tag'
     required: false
@@ -21,106 +20,173 @@ inputs:
     description: 'Tag format validation regex'
     required: false
     default: '^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$'
+  message:
+    description: 'Tag message (creates annotated tag if provided)'
+    required: false
+  lightweight:
+    description: 'Create lightweight tag (ignores message)'
+    required: false
+    default: 'false'
+
+outputs:
+  tag_sha:
+    description: 'SHA of the created tag'
+    value: ${{ steps.create_tag.outputs.tag_sha }}
+  tag_exists:
+    description: 'Whether tag existed before creation'
+    value: ${{ env.TAG_EXISTS }}
+  tag_url:
+    description: 'GitHub URL of the created tag'
+    value: ${{ steps.create_tag.outputs.tag_url }}
 
 runs:
   using: composite
   steps:
-    - name: Checkout repository
+    - name: Export inputs as env
+      shell: bash
+      run: |
+        echo "TAG_NAME=${{ inputs.tag }}" >> $GITHUB_ENV
+        echo "BRANCH_NAME=${{ inputs.branch }}" >> $GITHUB_ENV
+        echo "FORCE_CREATE=${{ inputs.force }}" >> $GITHUB_ENV
+        echo "LIGHTWEIGHT=${{ inputs.lightweight }}" >> $GITHUB_ENV
+        echo "TAG_MESSAGE=${{ inputs.message }}" >> $GITHUB_ENV
+        echo "TAG_FORMAT=${{ inputs.tag_format }}" >> $GITHUB_ENV
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v git &> /dev/null; then
+          echo "❌ Git is not installed"
+          exit 1
+        fi
+
+        if [[ ! "$TAG_NAME" =~ $TAG_FORMAT ]]; then
+          echo "❌ Invalid tag format: $TAG_NAME"
+          echo "Expected: $TAG_FORMAT"
+          exit 1
+        fi
+
+        if [ -z "$TAG_NAME" ]; then
+          echo "❌ Tag name cannot be empty"
+          exit 1
+        fi
+
+        echo "✅ Inputs validated"
+
+    - name: Checkout
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.branch }}
         fetch-depth: 0
         token: ${{ inputs.token }}
 
-    - name: Validate tag format
+    - name: Verify branch
       shell: bash
       run: |
-        TAG="${{ inputs.tag }}"
-        FORMAT="${{ inputs.tag_format }}"
-        
-        if [[ ! "$TAG" =~ $FORMAT ]]; then
-          echo "Invalid tag format: $TAG"
-          echo "Expected format: $FORMAT"
+        set -euo pipefail
+        echo "Verifying branch $BRANCH_NAME"
+
+        if ! git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+          echo "❌ Branch $BRANCH_NAME not found on remote"
           exit 1
         fi
-        echo "Tag format is valid: $TAG"
+
+        echo "✅ Branch exists"
 
     - name: Check if tag exists
-      id: check-tag
       shell: bash
       run: |
-        TAG="${{ inputs.tag }}"
-        
-        if git rev-parse "$TAG" >/dev/null 2>&1; then
-          echo "exists=true" >> $GITHUB_OUTPUT
-          echo "️Tag $TAG already exists"
-          
-          if [ "${{ inputs.force }}" != "true" ]; then
-            echo "Tag already exists. Use 'force' option to overwrite."
+        set -euo pipefail
+
+        TAG_EXISTS=false
+        if git rev-parse "$TAG_NAME" >/dev/null 2>&1 || git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+          TAG_EXISTS=true
+          if [ "$FORCE_CREATE" != "true" ]; then
+            echo "❌ Tag $TAG_NAME already exists. Use 'force: true' to overwrite"
             exit 1
-          else
-            echo "Force option enabled, will overwrite existing tag"
           fi
-        else
-          echo "exists=false" >> $GITHUB_OUTPUT
-          echo "Tag $TAG is available"
         fi
 
-    - name: Set Git configuration
+        echo "TAG_EXISTS=$TAG_EXISTS" >> $GITHUB_ENV
+        echo "Tag exists: $TAG_EXISTS"
+
+    - name: Configure Git user
       shell: bash
       run: |
         git config user.name "${{ github.actor }}"
         git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-    - name: Create/Update tag
+    - name: Create or replace tag
+      id: create_tag
       shell: bash
       run: |
-        TAG="${{ inputs.tag }}"
-        BRANCH="${{ inputs.branch }}"
+        set -euo pipefail
+
         COMMIT_SHA=$(git rev-parse HEAD)
-        
-        echo "Tag Details:"
-        echo "  Tag: $TAG"
-        echo "  Commit: $COMMIT_SHA"
-        echo "  Branch: $BRANCH"
-        echo "  Author: ${{ github.actor }}"
-        echo "  Force: ${{ inputs.force }}"
-        echo "  Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
-        
-        if [ "${{ steps.check-tag.outputs.exists }}" == "true" ] && [ "${{ inputs.force }}" == "true" ]; then
-          echo "Updating existing tag..."
-          git tag -f "$TAG" "$COMMIT_SHA"
-          git push origin ":refs/tags/$TAG" 
-          sleep 2
-          git push origin "$TAG"
-          echo "Tag $TAG updated successfully"
-        else
-          echo "Creating new tag..."
-          git tag "$TAG" "$COMMIT_SHA"
-          git push origin "$TAG"
-          echo "Tag $TAG created successfully"
+        echo "tag_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "tag_url=https://github.com/${{ github.repository }}/releases/tag/$TAG_NAME" >> $GITHUB_OUTPUT
+
+        echo "🏷️ Tag: $TAG_NAME"
+        echo "📌 Commit: $COMMIT_SHA"
+        echo "🧑 Author: ${{ github.actor }}"
+
+        if [ "$TAG_EXISTS" = "true" ]; then
+          echo "🗑️ Deleting existing tag..."
+          git tag -d "$TAG_NAME" || true
+          git push origin ":refs/tags/$TAG_NAME" || true
         fi
 
-    - name: Verify tag creation
+        if [ "$LIGHTWEIGHT" = "true" ]; then
+          git tag "$TAG_NAME"
+          echo "✅ Created lightweight tag"
+        elif [ -n "$TAG_MESSAGE" ]; then
+          git tag -a "$TAG_NAME" -m "$TAG_MESSAGE"
+          echo "✅ Created annotated tag with message"
+        else
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          echo "✅ Created annotated tag with default message"
+        fi
+
+        git push origin "$TAG_NAME"
+        echo "🚀 Tag pushed: $TAG_NAME"
+
+    - name: Verify tag
       shell: bash
       run: |
-        TAG="${{ inputs.tag }}"
-        
-        # Verify local tag
-        if git rev-parse "$TAG" >/dev/null 2>&1; then
-          echo "Local tag verified: $TAG"
-        else
-          echo "Local tag verification failed"
-          exit 1
+        set -euo pipefail
+        echo "⏳ Verifying remote tag exists..."
+
+        ATTEMPTS=0
+        while [ $ATTEMPTS -lt 5 ]; do
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+            echo "✅ Remote tag verified"
+            break
+          fi
+          ATTEMPTS=$((ATTEMPTS+1))
+          sleep 2
+        done
+
+        if [ $ATTEMPTS -eq 5 ]; then
+          echo "⚠️  Remote tag still not visible, might be delayed"
         fi
-        
-        # Wait a bit for remote sync
-        sleep 3
-        
-        # Verify remote tag
-        if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
-          echo "Remote tag verified: $TAG"
-          echo "Tag creation completed successfully!"
-        else
-          echo "Remote tag verification might be delayed, but push was successful"
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "## 🏷️ Tag Created" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag:** $TAG_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **SHA:** ${{ steps.create_tag.outputs.tag_sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch:** $BRANCH_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Type:** $([ "$LIGHTWEIGHT" = "true" ] && echo "Lightweight" || echo "Annotated")" >> $GITHUB_STEP_SUMMARY
+        echo "- **Force:** $FORCE_CREATE" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})" >> $GITHUB_STEP_SUMMARY
+
+        if [ -n "$TAG_MESSAGE" ]; then
+          echo "- **Message:** $TAG_MESSAGE" >> $GITHUB_STEP_SUMMARY
         fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 Tagging complete!" >> $GITHUB_STEP_SUMMARY
+
