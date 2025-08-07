@@ -3,54 +3,164 @@ description: Creates CloudFront invalidation to clear cache for updated content
 
 inputs:
   aws_access_key:
-    description: AWS access key ID
-    required: true
+    description: AWS access key ID (optional if using OIDC)
+    required: false
   aws_secret_key:
-    description: AWS secret access key
-    required: true
+    description: AWS secret access key (optional if using OIDC)
+    required: false
   aws_region:
-    description: AWS region (e.g. us-east-1)
+    description: AWS region
     required: true
+    default: "us-east-1"
+  role_to_assume:
+    description: AWS IAM role ARN to assume (for OIDC authentication)
+    required: false
+
   distribution_id:
     description: CloudFront distribution ID
     required: true
   paths:
-    description: Paths to invalidate (space-separated, e.g. "/* /index.html")
+    description: Paths to invalidate (space-separated, e.g. "/* /index.html /css/*")
     required: false
     default: "/*"
   caller_reference:
     description: Unique reference for this invalidation (auto-generated if not provided)
     required: false
-    default: ""
+  
+outputs:
+  invalidation_id:
+    description: The ID of the created invalidation
+    value: ${{ steps.invalidate.outputs.invalidation_id }}
+  status:
+    description: The status of the invalidation
+    value: ${{ steps.invalidate.outputs.status }}
 
 runs:
   using: composite
   steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -e
+        
+        if [ -z "${{ inputs.aws_access_key }}" ] && [ -z "${{ inputs.role_to_assume }}" ]; then
+          echo "❌ Either aws_access_key or role_to_assume must be provided"
+          exit 1
+        fi
+        
+        if [ -n "${{ inputs.aws_access_key }}" ] && [ -z "${{ inputs.aws_secret_key }}" ]; then
+          echo "❌ aws_secret_key is required when aws_access_key is provided"
+          exit 1
+        fi
+        
+        if ! command -v jq &> /dev/null; then
+          echo "❌ jq is required but not found. Please install jq or use ubuntu-latest runner"
+          exit 1
+        fi
+        
+        if [[ ! "${{ inputs.distribution_id }}" =~ ^E[A-Z0-9]{13}$ ]]; then
+          echo "❌ Invalid CloudFront distribution ID format: ${{ inputs.distribution_id }}"
+          echo "Expected format: E + 13 alphanumeric characters (e.g., E1234567890ABC)"
+          exit 1
+        fi
+        
+        PATHS="${{ inputs.paths }}"
+        if [ -z "$PATHS" ]; then
+          echo "❌ Paths cannot be empty"
+          exit 1
+        fi
+        
+        IFS=' ' read -ra PATHS_ARRAY <<< "$PATHS"
+        PATHS_COUNT=${#PATHS_ARRAY[@]}
+        if [ $PATHS_COUNT -gt 1000 ]; then
+          echo "❌ Too many paths ($PATHS_COUNT). CloudFront allows maximum 1000 paths per invalidation"
+          echo "Consider using fewer paths or /* wildcard"
+          exit 1
+        fi
+        for path in "${PATHS_ARRAY[@]}"; do
+          if [[ ! "$path" =~ ^/.* ]]; then
+            echo "❌ Invalid path: $path (must start with /)"
+            exit 1
+          fi
+        done
+        
+        if [ -n "${{ inputs.role_to_assume }}" ]; then
+          echo "🔐 Using OIDC authentication with role: ${{ inputs.role_to_assume }}"
+        else
+          echo "🔑 Using AWS access keys authentication"
+        fi
+        
+        echo "✅ Input validation passed ($PATHS_COUNT paths)"
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id:     ${{ inputs.aws_access_key }}
         aws-secret-access-key: ${{ inputs.aws_secret_key }}
-        aws-region:            ${{ inputs.aws_region }}
+        aws-access-key-id: ${{ inputs.aws_access_key }}
+        role-to-assume: ${{ inputs.role_to_assume }}
+        aws-region: ${{ inputs.aws_region }}
 
     - name: Create CloudFront invalidation
+      id: invalidate
       shell: bash
       run: |
+        set -e
+        
         if [ -z "${{ inputs.caller_reference }}" ]; then
-          CALLER_REF="github-actions-$(date +%s)-${{ github.run_id }}"
+          TIMESTAMP=$(date +%s)
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA=${SHORT_SHA:0:8}
+          CALLER_REF="gh-${TIMESTAMP}-${{ github.run_id }}-${SHORT_SHA}"
         else
           CALLER_REF="${{ inputs.caller_reference }}"
         fi
         
-        aws cloudfront create-invalidation \
-          --distribution-id ${{ inputs.distribution_id }} \
-          --invalidation-batch "{
-            \"Paths\": {
-              \"Quantity\": 1,
-              \"Items\": [\"${{ inputs.paths }}\"]
+        echo "🚀 Creating CloudFront invalidation..."
+        echo "Distribution ID: ${{ inputs.distribution_id }}"
+        echo "Caller Reference: ${CALLER_REF}"
+        echo "Paths: ${{ inputs.paths }}"
+        
+        IFS=' ' read -ra PATHS_ARRAY <<< "${{ inputs.paths }}"
+        PATHS_COUNT=${#PATHS_ARRAY[@]}
+        
+        PATHS_JSON=$(printf '%s\n' "${PATHS_ARRAY[@]}" | jq -R . | jq -s .)
+        echo "📝 Invalidating $PATHS_COUNT path(s)..."
+        
+        INVALIDATION_BATCH=$(jq -n \
+          --arg paths "$PATHS_JSON" \
+          --arg caller_ref "$CALLER_REF" \
+          --argjson quantity "$PATHS_COUNT" \
+          '{
+            "Paths": {
+              "Quantity": $quantity,
+              "Items": ($paths | fromjson)
             },
-            \"CallerReference\": \"${CALLER_REF}\"
-          }" \
-          --no-cli-pager
+            "CallerReference": $caller_ref
+          }')
+        INVALIDATION_RESPONSE=$(aws cloudfront create-invalidation \
+          --distribution-id "${{ inputs.distribution_id }}" \
+          --invalidation-batch "$INVALIDATION_BATCH" \
+          --output json \
+          --no-cli-pager)
+        
+        INVALIDATION_ID=$(echo "$INVALIDATION_RESPONSE" | jq -r '.Invalidation.Id')
+        STATUS=$(echo "$INVALIDATION_RESPONSE" | jq -r '.Invalidation.Status')
         
         echo "✅ CloudFront invalidation created successfully!"
+        echo "Invalidation ID: $INVALIDATION_ID"
+        echo "Status: $STATUS"
+        
+        echo "invalidation_id=$INVALIDATION_ID" >> $GITHUB_OUTPUT
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "## 📊 CloudFront Invalidation Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Distribution ID:** ${{ inputs.distribution_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Invalidation ID:** ${{ steps.invalidate.outputs.invalidation_id }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Status:** ${{ steps.invalidate.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Paths invalidated:** ${{ inputs.paths }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "ℹ️ Invalidation started. It may take 10-15 minutes to complete." >> $GITHUB_STEP_SUMMARY
+
