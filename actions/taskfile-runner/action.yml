@@ -64,6 +64,6 @@ runs:
       shell: bash
       working-directory: ${{ inputs.dir }}
       run: |
-        echo "🚀 Running task ${{ inputs.command }} in $PWD"
+        echo "🚀 Running task ${{ inputs.command }}"
         task ${{ inputs.command }}
 
