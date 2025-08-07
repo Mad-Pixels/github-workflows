@@ -157,10 +157,11 @@ runs:
         FILES_UPLOADED=$(echo "$OUTPUT" | grep -c "upload:" || true)
         FILES_DELETED=$(echo "$OUTPUT" | grep -c "delete:" || true)
         BYTES=$(find "$SOURCE" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
-
+        MB=$(awk "BEGIN {printf \"%.2f\", $BYTES/1024/1024}")
+        
         echo "files_uploaded=$FILES_UPLOADED" >> $GITHUB_OUTPUT
         echo "files_deleted=$FILES_DELETED" >> $GITHUB_OUTPUT
-        echo "total_size=$BYTES" >> $GITHUB_OUTPUT
+        echo "total_size_mb=$MB" >> $GITHUB_OUTPUT
         echo "s3_url=$S3_URL" >> $GITHUB_OUTPUT
 
     - name: Summary

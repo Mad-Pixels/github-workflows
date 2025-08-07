@@ -124,3 +124,12 @@ runs:
             exit 1
             ;;
         esac
+    
+    - name: Terraform Summary
+      shell: bash
+      run: |
+        echo "## 🛠️ Terraform Execution Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Command: \`${{ inputs.tf_command }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Directory: \`${{ inputs.tf_dir }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Workspace: \`${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Terraform version: \`${{ inputs.tf_version }}\`" >> "$GITHUB_STEP_SUMMARY"

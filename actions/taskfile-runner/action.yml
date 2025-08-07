@@ -63,3 +63,11 @@ runs:
       run: |
         echo "🚀 Running task ${{ inputs.command }}"
         task ${{ inputs.command }}
+
+    - name: Task Runner Summary
+      shell: bash
+      run: |
+        echo "## 🧰 Task Runner Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Command: \`${{ inputs.command }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Directory: \`${{ inputs.dir }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Task version: \`${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"

@@ -114,9 +114,7 @@ runs:
           --output json)
         
         echo "$UPDATE_RESPONSE"
-        echo "function_arn=$(echo "$UPDATE_RESPONSE" | jq -r '.FunctionArn')" >> $GITHUB_OUTPUT
         echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" >> $GITHUB_OUTPUT
-        echo "code_sha256=$(echo "$UPDATE_RESPONSE" | jq -r '.CodeSha256')" >> $GITHUB_OUTPUT
 
     - name: Wait for update completion
       if: inputs.wait_for_update == 'true'
@@ -134,6 +132,4 @@ runs:
         echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
         echo "- Function: $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
         echo "- Image URI: $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
-        echo "- ARN: ${{ steps.update.outputs.function_arn }}" >> $GITHUB_STEP_SUMMARY
-        echo "- SHA256: ${{ steps.update.outputs.code_sha256 }}" >> $GITHUB_STEP_SUMMARY
         echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" >> $GITHUB_STEP_SUMMARY

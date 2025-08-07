@@ -106,3 +106,22 @@ runs:
           -t "${{ inputs.repository }}:latest" \
           --push \
           "$CONTEXT"
+
+    - name: Docker Build Summary
+      shell: bash
+      run: |
+        echo "## 🐳 Docker Image Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Repository: \`${{ inputs.repository }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Tags:" >> "$GITHUB_STEP_SUMMARY"
+        echo "  - \`${{ inputs.repository }}:${{ inputs.tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "  - \`${{ inputs.repository }}:latest\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Platforms: \`${{ inputs.platforms }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Context: \`${{ steps.ctx.outputs.context }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Dockerfile: \`${{ steps.ctx.outputs.context }}/${{ inputs.dockerfile_path }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+        if [[ "${{ inputs.build_args }}" != "{}" ]]; then
+          echo "- Build args:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          echo '${{ inputs.build_args }}' | jq . >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi

@@ -133,7 +133,6 @@ runs:
         echo "✅ CloudFront invalidation created successfully!"
         echo "Invalidation ID: $INVALIDATION_ID"
         echo "Status: $STATUS"
-        
         echo "invalidation_id=$INVALIDATION_ID" >> $GITHUB_OUTPUT
         echo "status=$STATUS" >> $GITHUB_OUTPUT
 
@@ -141,7 +140,6 @@ runs:
       shell: bash
       run: |
         echo "## 📊 CloudFront Invalidation Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Distribution ID:** ${{ inputs.distribution_id }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Invalidation ID:** ${{ steps.invalidate.outputs.invalidation_id }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Status:** ${{ steps.invalidate.outputs.status }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Paths invalidated:** ${{ inputs.paths }}" >> $GITHUB_STEP_SUMMARY
