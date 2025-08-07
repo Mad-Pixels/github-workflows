@@ -16,7 +16,7 @@ inputs:
   image:
     description: "Task image"
     required: false
-    default: "ghcr.io/mad-pixels/images/taskfile:3.44.1"
+    default: "ghcr.io/mad-pixels/images/taskfile:v3.44.1"
 
 runs:
   using: "composite"
