@@ -284,6 +284,12 @@ Each contains its own `Taskfile.yml` and CI workflow, and is fully runnable out 
 |---------------------------------------|---------------------------------------------------------------------------------------------------------------|
 | [nodejs](./examples/flows/nodejs)     | Minimal Node.js starter: lint, format, unit tests, build, deploy (external job) and dev server all in Docker. |
 
+### Projects
+| Link                                            | Description                           |
+|-------------------------------------------------|---------------------------------------|
+| [about](https://github.com/mr-chelyshkin/about) | VueJS static site with AWS deployment |
+| [images](https://github.com/Mad-Pixels/images)  | Docker github registry                |
+
 ## Contributing
 We ❤️ community contributions! To get started:
 1. **Fork** the repo and create your feature branch:
