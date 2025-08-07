@@ -115,7 +115,7 @@ Deployment operations live in **reusable GitHub Actions**, completely separate f
 - 🔁 `Reusable workflows` — standardized deployment patterns across projects
 
 ### Business Benefits
-- 💰 `Reduced maintenance cost` — no more “works on my machine” syndrome
+- 💰 `Reduced maintenance cost` — no more "works on my machine" syndrome
 - 🚀 `Faster delivery` — fewer environment-specific bugs
 - 🔐 `Stronger security` — containerized, read-only, non-root execution
 - 📋 `Clear audit trails` — Git history = deployment history
@@ -277,7 +277,7 @@ jobs:
 ```
 
 ## Real-World Examples
-To make adoption as smooth as possible, we’ve prepared several opinionated example projects under [examples/](https://github.com/Mad-Pixels/github-workflows/tree/main/examples).  
+To make adoption as smooth as possible, we've prepared several opinionated example projects under [examples/](https://github.com/Mad-Pixels/github-workflows/tree/main/examples).  
 Each contains its own `Taskfile.yml` and CI workflow, and is fully runnable out of the box:
 
 | Example                               | Description                                                                                                   |
@@ -296,7 +296,7 @@ git checkout -b feature/my-cool-task
 3. Run the examples locally to verify nothing breaks
 4. Commit your changes
 5. Push and open a Pull Request against `main`.
-6. We’ll review, suggest feedback, and merge when ready!
+6. We'll review, suggest feedback, and merge when ready!
 
 Feel free to open issues for bugs or feature requests, and tag them with appropriate labels.
 
