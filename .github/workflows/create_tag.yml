@@ -38,3 +38,4 @@ jobs:
           branch: 'main'
           message: ${{ inputs.message }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          tag_format: '^v[0-9]+(\.[0-9]+)*'
