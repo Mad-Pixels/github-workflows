@@ -72,26 +72,22 @@ runs:
       with:
         terraform_version: ${{ inputs.tf_version }}
 
-    - name: Create backend_aws.hcl
+    - name: Write backend_aws.hcl
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
-        cat > backend_aws.hcl <<EOF
-bucket  = "${{ inputs.backend_bucket }}"
-key     = "${{ inputs.backend_key }}"
-region  = "${{ inputs.backend_region }}"
-encrypt = true
-EOF
+        echo "bucket  = \"${{ inputs.backend_bucket }}\""  >  backend_aws.hcl
+        echo "key     = \"${{ inputs.backend_key }}\""     >> backend_aws.hcl
+        echo "region  = \"${{ inputs.backend_region }}\""  >> backend_aws.hcl
+        echo "encrypt = true"                              >> backend_aws.hcl
 
-    - name: Create backend.tf with S3 backend block
+    - name: Write backend.tf
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
-        cat > backend.tf <<EOF
-terraform {
-  backend "s3" {}
-}
-EOF
+        echo 'terraform {'           >  backend.tf
+        echo '  backend "s3" {}'     >> backend.tf
+        echo '}'                     >> backend.tf
 
     - name: Terraform Init
       shell: bash
