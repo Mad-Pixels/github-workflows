@@ -1,6 +1,6 @@
 name: Task Runner
 
-description: Run Taskfile command using task binary from container, with Docker socket passthrough
+description: Run Taskfile
 
 inputs:
   go_dir:
@@ -13,10 +13,10 @@ inputs:
   vars:
     description: "Optional environment variables in format key:value,key:value"
     required: false
-  image:
-    description: "Task image (used only to extract binary)"
+  version:
+    description: "Task version to use"
     required: false
-    default: "ghcr.io/mad-pixels/images/taskfile:v3.44.1"
+    default: "3.44.1"
 
 runs:
   using: "composite"
@@ -24,23 +24,38 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Extract task binary from container
+    - name: Detect architecture and download task binary
       shell: bash
       run: |
-        docker run --rm --entrypoint cat \
-          ${{ inputs.image }} /usr/local/bin/task > "$GITHUB_WORKSPACE/task"
-        chmod +x "$GITHUB_WORKSPACE/task"
+        set -euo pipefail
 
-    - name: Parse and export environment variables
+        ARCH=$(uname -m)
+        case "$ARCH" in
+          x86_64) ARCH="amd64" ;;
+          aarch64) ARCH="arm64" ;;
+          *) echo "Unsupported architecture: $ARCH" && exit 1 ;;
+        esac
+
+        VERSION="${{ inputs.version }}"
+        echo "Downloading Task v$VERSION for $ARCH..."
+
+        curl -sL "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz" \
+          | tar -xz -C /tmp
+
+        sudo mv /tmp/task /usr/local/bin/task
+        sudo chmod +x /usr/local/bin/task
+        task --version
+
+    - name: Export environment variables
       if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
         echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
-          echo "$key=$value" >> "$GITHUB_ENV"
+          echo "$key=$value" >> $GITHUB_ENV
         done
 
-    - name: Run Task on host
+    - name: Run Task
       shell: bash
       working-directory: ${{ inputs.go_dir }}
       run: |
-        "$GITHUB_WORKSPACE/task" ${{ inputs.command }}
+        task ${{ inputs.command }}
