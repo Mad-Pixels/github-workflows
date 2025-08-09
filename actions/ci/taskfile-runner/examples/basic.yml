@@ -1,0 +1,34 @@
+---
+name: Basic Taskfile Usage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-checks:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run linting
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "lint"
+
+      - name: Run tests
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "test"
+
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    steps:
+      - name: Build production bundle
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "build"
+          vars: "NODE_ENV:production,BUILD_TARGET:dist"

@@ -1,0 +1,85 @@
+---
+name: Advanced Taskfile Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "20"
+  GO_VERSION: "1.21"
+
+jobs:
+  frontend:
+    name: Frontend Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint frontend code
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "frontend:lint"
+          dir: "./frontend"
+          vars: "NODE_VERSION:${{ env.NODE_VERSION }},CI:true"
+
+      - name: Test frontend
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "frontend:test"
+          dir: "./frontend"
+          vars: "NODE_VERSION:${{ env.NODE_VERSION }},COVERAGE:true"
+
+      - name: Build frontend
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "frontend:build"
+          dir: "./frontend"
+          vars: "NODE_VERSION:${{ env.NODE_VERSION }},BUILD_ENV:production"
+
+  backend:
+    name: Backend Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint backend code
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "backend:lint"
+          dir: "./backend"
+          vars: "GO_VERSION:${{ env.GO_VERSION }}"
+
+      - name: Test backend
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "backend:test"
+          dir: "./backend"
+          vars: "GO_VERSION:${{ env.GO_VERSION }},INTEGRATION_TESTS:true"
+
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run security audit
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "security:audit"
+          vars: "AUDIT_LEVEL:high,FAIL_ON_VULN:true"
+
+      - name: Check dependencies
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "security:deps"
+          vars: "CHECK_LICENSES:true,ALLOWED_LICENSES:MIT,Apache-2.0,BSD-3-Clause"
+
+  matrix-test:
+    name: Multi-version Testing
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        task-version: ['3.35.0', '3.38.0', '3.40.0']
+    steps:
+      - name: Test with Task v${{ matrix.task-version }}
+        uses: Mad-Pixels/github-workflows/actions/ci/taskfile-runner@v1.0.0
+        with:
+          command: "test"
+          version: ${{ matrix.task-version }}

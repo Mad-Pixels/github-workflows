@@ -18,11 +18,31 @@ inputs:
     required: false
     default: '3.44.1'
 
+outputs:
+  task_version:
+    description: 'Installed Task version'
+    value: ${{ steps.install.outputs.version }}
+  task_output:
+    description: 'Task command output'
+    value: ${{ steps.run.outputs.output }}
+
 runs:
   using: composite
   steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Validate Taskfile exists
+      shell: bash
+      working-directory: ${{ inputs.dir }}
+      run: |
+        if [[ ! -f "Taskfile.yml" && ! -f "Taskfile.yaml" ]]; then
+          echo "❌ No Taskfile found in ${{ inputs.dir }}"
+          echo "Expected: Taskfile.yml or Taskfile.yaml"
+          exit 1
+        fi
+
+        echo "✅ Taskfile found"
 
     - name: Detect architecture and install Task binary
       shell: bash
@@ -45,8 +65,9 @@ runs:
         sudo mv /tmp/task /usr/local/bin/task
         sudo chmod +x /usr/local/bin/task
 
-        echo "✅ Installed task binary:"
-        task --version
+        INSTALLED_VERSION=$(task --version | grep -o 'v[0-9.]*')
+        echo "✅ Installed task $INSTALLED_VERSION"
+        echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
 
     - name: Export environment variables
       if: ${{ inputs.vars != '' }}
@@ -54,16 +75,36 @@ runs:
       run: |
         echo "🌐 Exporting env vars:"
         echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
+          if [[ -z "$key" || -z "$value" ]]; then
+            echo "❌ Invalid var format: $key:$value"
+            exit 1
+          fi
           echo "  - $key=$value"
           echo "$key=$value" >> $GITHUB_ENV
         done
 
     - name: Run Taskfile command
+      id: run
       shell: bash
       working-directory: ${{ inputs.dir }}
       run: |
         echo "🚀 Running task ${{ inputs.command }}"
-        task ${{ inputs.command }}
+        set +e
+        OUTPUT=$(task ${{ inputs.command }} 2>&1)
+        EXIT_CODE=$?
+        set -e
+        
+        echo "$OUTPUT"
+        echo "output<<EOF" >> $GITHUB_OUTPUT
+        echo "$OUTPUT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        if [[ $EXIT_CODE -ne 0 ]]; then
+          echo "❌ Task failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+        
+        echo "✅ Task completed successfully"
 
     - name: Task Runner Summary
       shell: bash
@@ -71,4 +112,7 @@ runs:
         echo "## 🧰 Task Runner Summary" >> "$GITHUB_STEP_SUMMARY"
         echo "- Command: \`${{ inputs.command }}\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Directory: \`${{ inputs.dir }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Task version: \`${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Task version: \`${{ steps.install.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+        if [[ "${{ inputs.vars }}" != "" ]]; then
+          echo "- Environment variables: \`${{ inputs.vars }}\`" >> "$GITHUB_STEP_SUMMARY"
+        fi
