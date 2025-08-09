@@ -1,0 +1,22 @@
+---
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-matrix:
+    name: Test Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ['18', '20', '22']
+    steps:
+      - name: Test with Node ${{ matrix.node-version }}
+        uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1
+        with:
+          command: "test"
+          vars: "NODE_VERSION:${{ matrix.node-version }}"
