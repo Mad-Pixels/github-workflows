@@ -106,7 +106,7 @@ runs:
         echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
 
     - name: Export environment variables
-      if: ${{ inputs.vars != '' && trim(inputs.vars) != '' }}
+      if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
         set -euo pipefail

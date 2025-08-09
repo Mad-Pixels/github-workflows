@@ -145,7 +145,7 @@ runs:
           git tag "$TAG_NAME"
           echo "✅ Created lightweight tag"
         elif [ -n "$TAG_MESSAGE" ]; then
-          git tag -a "$TAG_NAME" -m "$TAG_MESSAGE"
+          printf "%s" "$TAG_MESSAGE" | git tag -a "$TAG_NAME" -F -
           echo "✅ Created annotated tag with message"
         else
           git tag -a "$TAG_NAME" -m "Release $TAG_NAME"

@@ -1,0 +1,58 @@
+---
+name: Terraform Plan & Apply
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Run Terraform Plan
+        uses: Mad-Pixels/github-workflows/actions/terraform-runner@v1
+        with:
+          aws_region: us-east-1
+          role_to_assume: arn:aws:iam::123456789012:role/TerraformRole
+          tf_dir: infra/
+          tf_workspace: production
+          tf_command: plan
+          tf_vars: "-var image_tag=${{ github.sha }}"
+          tf_version: 1.8.5
+          backend_bucket: my-terraform-state
+          backend_key: production/terraform.tfstate
+          backend_region: us-east-1
+
+  apply:
+    name: Terraform Apply (manual)
+    needs: plan
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: infra/
+
+      - name: Run Terraform Apply
+        uses: Mad-Pixels/github-workflows/actions/terraform-runner@v1
+        with:
+          aws_region: us-east-1
+          role_to_assume: arn:aws:iam::123456789012:role/TerraformRole
+          tf_dir: infra/
+          tf_workspace: production
+          tf_command: apply
+          tf_version: 1.8.5
+          backend_bucket: my-terraform-state
+          backend_key: production/terraform.tfstate
+          backend_region: us-east-1

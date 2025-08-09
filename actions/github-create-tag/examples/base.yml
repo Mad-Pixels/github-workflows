@@ -1,0 +1,33 @@
+name: Create tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (e.g., v1.0.0)'
+        required: true
+        type: string
+      force:
+        description: 'Force overwrite existing tag'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: manual-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke
+        uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
+        with:
+          tag: ${{ inputs.tag }}
+          force: ${{ inputs.force }}
+          token: ${{ secrets.PAT_TOKEN }}

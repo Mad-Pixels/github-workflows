@@ -1,0 +1,46 @@
+name: Sync Directory to S3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync-to-s3:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required if using role_to_assume (OIDC)
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Example: build static site into ./dist (optional)
+      # - name: Build site
+      #   run: |
+      #     npm ci
+      #     npm run build
+
+      - name: Sync ./dist to S3 via OIDC
+        uses: Mad-Pixels/github-workflows/actions/s3-sync@v1
+        with:
+          aws_region: us-east-1
+          role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC-Deploy
+          bucket_name: my-static-site-bucket
+          source_dir: dist
+          bucket_prefix: web
+          delete_removed: 'true'
+          exclude_patterns: ".git/* .github/* .DS_Store"
+          cache_control: "public, max-age=31536000, immutable"
+
+      # Example for static credentials instead of OIDC:
+      # - name: Sync using static keys
+      #   uses: Mad-Pixels/github-workflows/actions/s3-sync@v1
+      #   with:
+      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws_region: us-east-1
+      #     bucket_name: my-static-site-bucket
+      #     source_dir: dist
+      #     bucket_prefix: web
+      #     delete_removed: 'true'

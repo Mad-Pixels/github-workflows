@@ -1,6 +1,6 @@
 ---
 name: 'Terraform Runner'
-description: 'Invoke terraform actions'
+description: 'Invoke terraform actions with S3 backend and optional AWS OIDC authentication'
 
 inputs:
   aws_access_key_id:
@@ -54,7 +54,7 @@ runs:
         fetch-depth: 1
 
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_secret_key: ${{ inputs.aws_secret_access_key }}
         aws_access_key: ${{ inputs.aws_access_key_id }}
@@ -107,24 +107,34 @@ runs:
       run: terraform validate
 
     - name: Run Terraform Command
+      id: tf-run
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
         case "${{ inputs.tf_command }}" in
           plan)
-            terraform plan -input=false ${{ inputs.tf_vars }}
+            terraform plan -input=false -lock-timeout=300s -out=tfplan ${{ inputs.tf_vars }}
             ;;
           apply)
-            terraform apply -input=false -auto-approve ${{ inputs.tf_vars }}
+            terraform apply -input=false -auto-approve -lock-timeout=300s ${{ inputs.tf_vars }}
             ;;
           destroy)
-            terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }}
+            terraform destroy -input=false -auto-approve -lock-timeout=300s ${{ inputs.tf_vars }}
             ;;
           *)
             echo "❌ Unknown tf_command: ${{ inputs.tf_command }}" >&2
             exit 1
             ;;
         esac
+
+    - name: Upload plan artifact
+      if: inputs.tf_command == 'plan'
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan
+        path: ${{ inputs.tf_dir }}/tfplan
+        if-no-files-found: error
+
     - name: Terraform Summary
       shell: bash
       run: |
@@ -135,3 +145,9 @@ runs:
         echo "- Directory: \`${{ inputs.tf_dir }}\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Workspace: \`$WORKSPACE\`" >> "$GITHUB_STEP_SUMMARY"
         echo "- Terraform version: \`${{ inputs.tf_version }}\`" >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "${{ inputs.tf_command }}" = "plan" ]; then
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 📄 Plan Diff" >> "$GITHUB_STEP_SUMMARY"
+          terraform show -no-color ${{ inputs.tf_dir }}/tfplan >> "$GITHUB_STEP_SUMMARY"
+        fi

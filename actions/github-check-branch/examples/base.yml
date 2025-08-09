@@ -1,0 +1,25 @@
+---
+name: Branch Validation Example
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to validate'
+        required: false
+        default: ''
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate commit or tag against main
+        id: branch-check
+        uses: Mad-Pixels/github-workflows/actions/branch-validator@v1
+        with:
+          target_branch: main
+          tag_name: ${{ github.event.inputs.tag }}
+
+      - name: Conditional step on valid branch
+        if: steps.branch-check.outputs.is_valid == 'true'
+        run: echo "✅ Commit is from the target branch. Proceeding with deployment..."

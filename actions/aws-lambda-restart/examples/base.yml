@@ -1,0 +1,22 @@
+name: Restart Lambda
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lambda-restart:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Restart Lambda with specific image
+        uses: Mad-Pixels/github-workflows/actions/lambda-restart@v1
+        with:
+          aws_region: us-east-1
+          aws_account_id: 123456789012
+          role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC
+          function_name: my-service-prod
+          repository: my-service
+          image_tag: latest
+          wait_for_update: 'true'
