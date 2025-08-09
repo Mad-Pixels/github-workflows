@@ -1,17 +1,17 @@
 ---
-name: DockerHub Push
-description: Build and push multi-platform Docker images to DockerHub.
+name: Docker Build && Push
+description: Build and push multi-platform Docker images to Docker repository.
 
 inputs:
   docker_user:
-    description: 'DockerHub username'
+    description: 'Docker repository username'
     required: true
   docker_token:
-    description: 'DockerHub access token'
+    description: 'Docker repository access token'
     required: true
 
   repository:
-    description: 'DockerHub repository name (e.g. username/image)'
+    description: 'Docker repository name (e.g. username/image)'
     required: true
   tag:
     description: 'Tag for the Docker image (e.g. v1.0.0)'
@@ -69,7 +69,7 @@ runs:
         name: ${{ inputs.artifact_name }}
         path: ./artifact
 
-    - name: DockerHub login
+    - name: Docker login
       uses: docker/login-action@v3
       with:
         username: ${{ inputs.docker_user }}
