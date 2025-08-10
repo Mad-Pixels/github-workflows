@@ -80,6 +80,7 @@ runs:
 
         read -r -a PATHS_ARRAY <<< "$PATHS"
         PATHS_COUNT=${#PATHS_ARRAY[@]}
+
         if (( PATHS_COUNT == 0 )); then
           echo "❌ No paths provided"
           exit 1
@@ -204,8 +205,12 @@ runs:
         LIMIT="${{ inputs.summary_limit }}"
         [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
 
-        PATHS_RAW="${{ inputs.paths }}"
-        mapfile -t P_ARR < <(printf '%s\n' $PATHS_RAW)
+        PATHS_RAW='${{ inputs.paths }}'
+
+        set -f
+        IFS=' ' read -r -a P_ARR <<< "$PATHS_RAW"
+        set +f
+
         TOTAL="${#P_ARR[@]}"
         SHOW="$LIMIT"; (( TOTAL < LIMIT )) && SHOW="$TOTAL"
 
