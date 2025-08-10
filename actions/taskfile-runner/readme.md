@@ -38,8 +38,8 @@ jobs:
 | `vars`          | ❌ No        | Comma-separated key=value pairs. Values may contain = and newlines; commas are not allowed. Leading/trailing spaces around pairs are trimmed | -           |
 | `dir`           | ❌ No        | Working directory for the Taskfile                                                                                                           | `.`         |
 | `version`       | ❌ No        | Version of go-task to install                                                                                                                | `3.44.1`    |
-| `show_summary`  | ❌ No        | Print summary with task output in job summary                                                                                                | `true`    |
-| `summary_limit` | ❌ No        | Max number of output lines to show in summary                                                                                                | `250`    |
+| `show_summary`  | ❌ No        | Print summary with task output in job summary                                                                                                | `true`      |
+| `summary_limit` | ❌ No        | Max number of output lines to show in summary                                                                                                | `250`       |
 
 ## 📤 Outputs
 | **Name**       | **Description**                    |
