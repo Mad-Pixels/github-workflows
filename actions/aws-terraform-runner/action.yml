@@ -86,7 +86,7 @@ runs:
         echo "✅ Inputs validated"
 
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@concept2
       with:
         aws_secret_key: ${{ inputs.aws_secret_access_key }}
         aws_access_key: ${{ inputs.aws_access_key_id }}
