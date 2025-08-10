@@ -91,7 +91,10 @@ runs:
         TMPDIR="$(mktemp -d)"; trap 'rm -rf "$TMPDIR"' EXIT
         mkdir -p "$HOME/.cache/task"
 
-        curl -fsSLo "$TMPDIR/task.tgz" "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz"
+        BASE="https://github.com/go-task/task/releases/download"
+        FILE="task_linux_${ARCH}.tar.gz"
+        URL="${BASE}/v${VERSION}/${FILE}"
+        curl -fsSLo "$TMPDIR/task.tgz" "$URL"
         tar -xzf "$TMPDIR/task.tgz" -C "$TMPDIR"
 
         TASK_BIN="$(find "$TMPDIR" -maxdepth 3 -type f -name task -perm -111 -print -quit || true)"
@@ -214,4 +217,3 @@ runs:
             echo '```'
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

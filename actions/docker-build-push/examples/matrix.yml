@@ -35,4 +35,3 @@ jobs:
           build_args: '{"VERSION":"${{ github.sha }}","SERVICE":"${{ matrix.name }}"}'
           context_path: ${{ matrix.context }}
           dockerfile_path: ${{ matrix.dockerfile }}
-

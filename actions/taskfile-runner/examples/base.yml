@@ -26,4 +26,3 @@ jobs:
           echo "Task version:  ${{ steps.task.outputs.task_version }}"
           echo "Task output:"
           printf "%s\n" "${{ steps.task.outputs.task_output }}"
-

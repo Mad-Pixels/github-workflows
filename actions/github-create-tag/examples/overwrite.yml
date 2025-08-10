@@ -1,3 +1,4 @@
+---
 name: Create/Replace tag
 
 on:
@@ -28,6 +29,5 @@ jobs:
         uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
         with:
           tag: ${{ inputs.tag }}
-          force: ${{ inputs.force }} 
+          force: ${{ inputs.force }}
           token: ${{ secrets.PAT_TOKEN }}
-

@@ -66,12 +66,12 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
+
         if [ -n "${TAG_NAME//[$'\t\r\n ']/}" ] && [ -n "${COMMIT_SHA_INPUT//[$'\t\r\n ']/}" ]; then
           echo "❌ Cannot specify both tag_name and commit_sha"
           exit 1
         fi
-         
+
         if [ -n "${COMMIT_SHA_INPUT//[$'\t\r\n ']/}" ]; then
           if [[ ! "${COMMIT_SHA_INPUT}" =~ ^[a-f0-9]{7,40}$ ]]; then
             echo "❌ Invalid commit SHA format: ${COMMIT_SHA_INPUT}"
@@ -79,12 +79,12 @@ runs:
             exit 1
           fi
         fi
-         
+
         if [[ ! "${TARGET_BRANCH}" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
           echo "❌ Invalid branch name: ${TARGET_BRANCH}"
           exit 1
         fi
-         
+
         echo "✅ Inputs validated"
 
     - name: Fetch target branch and tags
@@ -189,26 +189,25 @@ runs:
         LIMIT: ${{ inputs.summary_limit }}
       run: |
         set -euo pipefail
-        
+
         RESULT_ICON="❌"
         if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
           RESULT_ICON="✅"
         fi
-        
+
         # LIMIT kept for interface parity (not used for truncation here)
         [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
-        
+
         {
           echo "## 🔎 Branch Validator ${RESULT_ICON}"
           echo "- **Target branch:** \`${{ inputs.target_branch }}\`"
           echo "- **Subject:** \`${{ steps.validate.outputs.subject || 'N/A' }}\`"
           echo "- **Commit:** \`${{ steps.validate.outputs.commit || 'N/A' }}\`"
           echo "- **Reachable:** \`${{ steps.validate.outputs.is_valid || 'false' }}\`"
-          
+
           if [ -n "${{ steps.validate.outputs.merge_base || '' }}" ]; then
             echo "- **Common ancestor:** \`${{ steps.validate.outputs.merge_base }}\`"
           fi
-          
           echo ""
           if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
             echo "✅ **Validation passed** — commit is reachable from target branch"
@@ -220,4 +219,3 @@ runs:
             fi
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

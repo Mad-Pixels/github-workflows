@@ -26,4 +26,3 @@ jobs:
           build_args: '{"VERSION":"${{ github.sha }}","NODE_ENV":"production"}'
           context_path: .
           dockerfile_path: Dockerfile
-

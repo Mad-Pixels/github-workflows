@@ -61,4 +61,3 @@ jobs:
           backend_bucket: my-terraform-state
           backend_key: production/terraform.tfstate
           backend_region: us-east-1
-

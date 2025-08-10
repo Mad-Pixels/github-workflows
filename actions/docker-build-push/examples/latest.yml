@@ -21,4 +21,3 @@ jobs:
           build_args: '{"VERSION":"v1.2.3"}'
           context_path: .
           dockerfile_path: Dockerfile
-

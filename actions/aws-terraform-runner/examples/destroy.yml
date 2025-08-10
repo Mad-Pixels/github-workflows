@@ -1,3 +1,4 @@
+---
 name: Terraform Destroy (manual)
 
 on:
@@ -12,8 +13,8 @@ on:
         description: 'Type TRUE to confirm destroy'
         required: true
         type: choice
-        options: [FALSE, TRUE]
-        default: FALSE
+        options: [false, true]
+        default: false
 
 concurrency:
   group: tf-destroy-${{ github.event.inputs.workspace }}
@@ -50,5 +51,4 @@ jobs:
     if: github.event.inputs.confirm != 'TRUE'
     runs-on: ubuntu-latest
     steps:
-      - run: echo "❌ Destroy blocked: set input 'confirm' to TRUE to proceed."
-
+      - run: echo "❌ Destroy blocked - set input 'confirm' to TRUE to proceed."

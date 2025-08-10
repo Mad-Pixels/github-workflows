@@ -1,3 +1,4 @@
+---
 name: Create tag from branch
 
 on:
@@ -30,4 +31,3 @@ jobs:
           tag: ${{ inputs.tag }}
           branch: ${{ inputs.branch }}
           token: ${{ secrets.PAT_TOKEN }}
-

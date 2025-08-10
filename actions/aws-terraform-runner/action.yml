@@ -249,7 +249,8 @@ runs:
           echo "- **Directory:** \`${{ inputs.tf_dir }}\`"
           echo "- **Workspace:** \`$WORKSPACE\`"
           echo "- **Terraform version:** \`$TFV\`"
-          echo "- **Backend:** S3 \`${{ inputs.backend_bucket }}:${{ inputs.backend_key }}\` in \`${{ inputs.backend_region }}\`"
+          echo "- **Backend:** S3 \`${{ inputs.backend_bucket }}:${{ inputs.backend_key }}\`"
+          echo "  in \`${{ inputs.backend_region }}\`"
           echo "- **AWS region (vars):** \`${{ inputs.aws_region }}\`"
 
           if [[ "${{ inputs.tf_command }}" == "plan" && -f "tfplan" ]]; then
@@ -263,4 +264,3 @@ runs:
             fi
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

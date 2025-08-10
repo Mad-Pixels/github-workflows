@@ -30,7 +30,6 @@ jobs:
           repository: myuser/static-site
           tag: ${{ github.run_number }}
           artifact_name: web-dist
-          context_path: .   
-          dockerfile_path: Dockerfile 
+          context_path: .
+          dockerfile_path: Dockerfile
           platforms: linux/amd64,linux/arm64
-

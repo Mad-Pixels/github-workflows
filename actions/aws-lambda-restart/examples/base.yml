@@ -1,3 +1,4 @@
+---
 name: Lambda Restart
 
 on:
@@ -39,4 +40,3 @@ jobs:
           echo "Function ARN:  ${{ steps.restart.outputs.function_arn }}"
           echo "Code SHA256:   ${{ steps.restart.outputs.code_sha256 }}"
           echo "Last Modified:  ${{ steps.restart.outputs.last_modified }}"
-

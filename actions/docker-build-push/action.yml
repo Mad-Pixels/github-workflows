@@ -249,7 +249,9 @@ runs:
           ATTEMPT=$((ATTEMPT + 1))
           echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
 
-          if DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" 2>/dev/null | awk '/Digest:/ {print $2; exit}'); then
+          if DIGEST=$(
+            docker buildx imagetools inspect \
+              "${IMAGE}:${TAG}" 2>/dev/null | awk '/Digest:/ {print $2; exit}'); then
             if [[ -n "${DIGEST}" ]]; then
               echo "✅ Digest resolved: ${DIGEST}"
               break
@@ -266,8 +268,13 @@ runs:
           exit 1
         fi
 
-        SIZE_INFO=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{.Manifest.Size}}' 2>/dev/null || true)
-        : "${SIZE_INFO:=unknown}"
+        SIZE_INFO="$(
+          docker buildx imagetools inspect \
+            "${IMAGE}:${TAG}" \
+            --format '{{.Manifest.Size}}' \
+            2>/dev/null || true
+          )"
+          : "${SIZE_INFO:=unknown}"
 
         echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
         echo "image_size=${SIZE_INFO}" >> "$GITHUB_OUTPUT"
@@ -331,4 +338,3 @@ runs:
             echo "❌ **Build failed** — check logs for details"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

@@ -161,7 +161,7 @@ runs:
             git tag -d "$TAG_NAME"
             echo "✅ Local tag deleted"
           fi
-          
+
           if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
             git push origin ":refs/tags/$TAG_NAME"
             echo "✅ Remote tag deleted"
@@ -171,7 +171,7 @@ runs:
         if [ "$LIGHTWEIGHT" = "true" ]; then
           git tag "$TAG_NAME"
           echo "✅ Created lightweight tag"
-        elif [ -n "${TAG_MESSAGE// /}" ]; then 
+        elif [ -n "${TAG_MESSAGE// /}" ]; then
           printf "%s" "$TAG_MESSAGE" | git tag -a "$TAG_NAME" -F -
           echo "✅ Created annotated tag with message"
         else
@@ -238,4 +238,3 @@ runs:
           echo ""
           echo "🎉 Tagging complete!"
         } >> "$GITHUB_STEP_SUMMARY"
-

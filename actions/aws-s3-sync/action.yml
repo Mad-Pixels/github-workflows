@@ -168,7 +168,10 @@ runs:
         fi
 
         echo "🔍 Checking S3 bucket access..."
-        if ! aws s3api head-bucket --bucket "${{ inputs.bucket_name }}" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+        if ! aws s3api head-bucket \
+          --bucket "${{ inputs.bucket_name }}" \
+          --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
+
           echo "❌ Cannot access S3 bucket: ${{ inputs.bucket_name }}"
           echo "   Ensure the bucket exists, region matches, and IAM permissions are sufficient."
           exit 1
@@ -276,4 +279,3 @@ runs:
             echo "- **Status:** Sync failed — check logs above"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

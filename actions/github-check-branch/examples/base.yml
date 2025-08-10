@@ -1,3 +1,4 @@
+---
 name: Deploy by Tag (validated)
 
 on:
@@ -36,4 +37,3 @@ jobs:
         run: |
           echo "❌ Tag ${{ github.event.inputs.tag }} is NOT from main"
           exit 1
-

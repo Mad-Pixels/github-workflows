@@ -112,7 +112,8 @@ runs:
           IMAGE_URI="${{ inputs.image_uri }}"
           echo "🎯 Using provided image URI"
         else
-          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.repository }}:${{ inputs.image_tag }}"
+          REGISTRY_HOST="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+          IMAGE_URI="${REGISTRY_HOST}/${{ inputs.repository }}:${{ inputs.image_tag }}"
           echo "🎯 Constructed image URI from repository and tag"
         fi
 
@@ -226,4 +227,3 @@ runs:
             echo "- **Status:** Update failed — check logs above"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
-

@@ -1,3 +1,4 @@
+---
 name: Create annotated tag (multi-line message)
 
 on:
@@ -29,4 +30,3 @@ jobs:
             - Memory p95: -30%
             - Bugfix: #123, #124
           token: ${{ secrets.PAT_TOKEN }}
-
