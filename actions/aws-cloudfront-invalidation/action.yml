@@ -221,10 +221,6 @@ runs:
           echo "- **Status:** \`${{ steps.invalidate.outputs.status || 'N/A' }}\`"
           echo "- **CallerReference:** \`${{ steps.invalidate.outputs.caller_reference || 'auto' }}\`"
           echo "- **Distribution:** \`${DIST}\`"
-          if [[ -n "$CF_LINK" ]]; then
-            echo "- **Console:** ${CF_LINK}"
-          fi
-
           echo ""
           if (( TOTAL > 0 )); then
             if (( TOTAL <= LIMIT )); then

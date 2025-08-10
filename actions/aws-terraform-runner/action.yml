@@ -247,7 +247,7 @@ runs:
       run: |
         set -euo pipefail
 
-        WS="${{ inputs.tf_workspace != '' && inputs.tf_workspace || steps.collect.outputs.workspace }}"
+        WS="${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}"
         TFV="${{ steps.collect.outputs.terraform_version }}"
 
         LIMIT_RAW="${{ inputs.summary_limit }}"
