@@ -1,0 +1,42 @@
+---
+name: Lambda Restart
+
+on:
+  workflow_dispatch:
+    inputs:
+      function:
+        description: 'Lambda function name'
+        required: true
+        type: string
+      image_uri:
+        description: 'Full ECR image URI (e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com/svc@sha256:...)'
+        required: true
+        type: string
+      wait:
+        description: 'Wait until function becomes Active'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Update Lambda to image_uri
+        id: restart
+        uses: Mad-Pixels/github-workflows/actions/lambda-restart@v1
+        with:
+          aws_region: us-east-1
+          role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC
+          function_name: ${{ inputs.function }}
+          image_uri: ${{ inputs.image_uri }}
+          wait_for_update: ${{ inputs.wait }}
+
+      - name: Show outputs
+        run: |
+          echo "Function ARN:  ${{ steps.restart.outputs.function_arn }}"
+          echo "Code SHA256:   ${{ steps.restart.outputs.code_sha256 }}"
+          echo "Last Modified:  ${{ steps.restart.outputs.last_modified }}"

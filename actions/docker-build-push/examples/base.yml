@@ -1,0 +1,28 @@
+---
+name: Build & Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Build & Push Multi-Platform Image
+        uses: Mad-Pixels/github-workflows/actions/docker-build-push@v1
+        with:
+          docker_user: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_token: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: myuser/myimage
+          tag: ${{ github.sha }}
+          push_latest: 'true'
+          platforms: linux/amd64,linux/arm64
+          build_args: '{"VERSION":"${{ github.sha }}","NODE_ENV":"production"}'
+          context_path: .
+          dockerfile_path: Dockerfile

@@ -1,0 +1,39 @@
+---
+name: Deploy by Tag (validated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to deploy (e.g., v1.2.3)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-${{ github.event.inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate tag against main
+        id: check
+        uses: Mad-Pixels/github-workflows/actions/branch-validator@v1
+        with:
+          target_branch: main
+          tag_name: ${{ github.event.inputs.tag }}
+
+      - name: Proceed with deployment
+        if: steps.check.outputs.is_valid == 'true'
+        run: |
+          echo "✅ Tag ${{ github.event.inputs.tag }} is reachable from main"
+
+      - name: Stop if invalid
+        if: steps.check.outputs.is_valid != 'true'
+        run: |
+          echo "❌ Tag ${{ github.event.inputs.tag }} is NOT from main"
+          exit 1

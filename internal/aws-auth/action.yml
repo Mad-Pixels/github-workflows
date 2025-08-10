@@ -64,3 +64,4 @@ runs:
         }
         echo "✅ AWS authentication successful"
         echo "::endgroup::"
+

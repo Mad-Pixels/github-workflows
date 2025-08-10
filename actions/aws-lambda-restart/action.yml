@@ -1,29 +1,30 @@
 ---
-name: Lambda Restart
-description: Update AWS Lambda function with latest container image from ECR
+name: 'Lambda Restart'
+description: 'Update an AWS Lambda function'
 
 inputs:
   aws_access_key_id:
-    description: 'AWS access key ID (optional if using OIDC)'
+    description: 'AWS access key ID'
     required: false
   aws_secret_access_key:
-    description: 'AWS secret access key (optional if using OIDC)'
+    description: 'AWS secret access key'
     required: false
   aws_region:
     description: 'AWS region'
     required: true
   aws_account_id:
     description: 'AWS account ID'
-    required: true
+    required: false
   role_to_assume:
-    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    description: 'AWS IAM role ARN to assume'
     required: false
 
   function_name:
     description: 'Full Lambda function name'
     required: true
+
   image_uri:
-    description: 'Full ECR image URI (if provided, takes precedence over repository/tag)'
+    description: 'Full ECR image URI'
     required: false
   repository:
     description: 'ECR repository name'
@@ -32,110 +33,197 @@ inputs:
     description: 'ECR image tag'
     required: false
     default: 'latest'
+
   wait_for_update:
-    description: 'Wait for function update to complete'
+    description: 'Wait for function to become Active after update'
     required: false
     default: 'true'
+
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of lines to show in summary (kept for consistency)'
+    required: false
+    default: '250'
 
 outputs:
   function_arn:
     description: 'Lambda function ARN'
-    value: ${{ steps.update.outputs.function_arn }}
+    value: ${{ steps.update_code.outputs.function_arn }}
   last_modified:
     description: 'Function last modified timestamp'
-    value: ${{ steps.update.outputs.last_modified }}
+    value: ${{ steps.update_code.outputs.last_modified }}
   code_sha256:
     description: 'Function code SHA256'
-    value: ${{ steps.update.outputs.code_sha256 }}
+    value: ${{ steps.update_code.outputs.code_sha256 }}
+  image_uri:
+    description: 'Resolved image URI used for the update'
+    value: ${{ steps.resolve_image.outputs.image_uri }}
 
 runs:
-  using: "composite"
+  using: composite
   steps:
-    - name: Set environment variables
-      shell: bash
-      run: |
-        echo "FUNCTION_NAME=${{ inputs.function_name }}" >> $GITHUB_ENV
-        echo "AWS_REGION=${{ inputs.aws_region }}" >> $GITHUB_ENV
-
-        if [ -n "${{ inputs.image_uri }}" ]; then
-          IMAGE_URI="${{ inputs.image_uri }}"
-        else
-          IMAGE_URI="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
-          IMAGE_URI="$IMAGE_URI/${{ inputs.repository }}:${{ inputs.image_tag }}"
-        fi
-        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
-
     - name: Validate inputs
       shell: bash
       run: |
-        set -e
+        set -euo pipefail
 
-        if ! command -v aws &>/dev/null || ! command -v jq &>/dev/null; then
-          echo "❌ AWS CLI and jq are required"
+        if [[ ! "${{ inputs.aws_region }}" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+          echo "❌ Invalid AWS region: ${{ inputs.aws_region }}"
           exit 1
         fi
 
-        if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
-          echo "❌ Invalid AWS account ID: ${{ inputs.aws_account_id }}"
+        if [[ -z "${{ inputs.function_name }}" ]]; then
+          echo "❌ function_name is required"
           exit 1
         fi
 
-        if [ -z "${{ inputs.image_uri }}" ] && [ -z "${{ inputs.repository }}" ]; then
-          echo "❌ Provide either image_uri or repository"
+        if [[ -z "${{ inputs.image_uri }}" && -z "${{ inputs.repository }}" ]]; then
+          echo "❌ Provide either image_uri or repository(+image_tag)"
           exit 1
+        fi
+
+        if [[ -z "${{ inputs.image_uri }}" ]]; then
+          if [[ ! "${{ inputs.aws_account_id }}" =~ ^[0-9]{12}$ ]]; then
+            echo "❌ Invalid or missing aws_account_id: '${{ inputs.aws_account_id }}'"
+            exit 1
+          fi
         fi
 
         echo "✅ Inputs validated"
 
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_access_key: ${{ inputs.aws_access_key_id }}
         aws_secret_key: ${{ inputs.aws_secret_access_key }}
         role_to_assume: ${{ inputs.role_to_assume }}
         aws_region: ${{ inputs.aws_region }}
 
-    - name: Validate Lambda function exists
+    - name: Resolve image URI
+      id: resolve_image
       shell: bash
       run: |
-        set -e
-        aws lambda get-function \
-          --function-name "$FUNCTION_NAME" \
-          --region "$AWS_REGION" >/dev/null || {
-            echo "❌ Lambda function not found: $FUNCTION_NAME"
-            exit 1
-          }
+        set -euo pipefail
+
+        if [[ -n "${{ inputs.image_uri }}" ]]; then
+          IMAGE_URI="${{ inputs.image_uri }}"
+          echo "🎯 Using provided image URI"
+        else
+          REGISTRY_HOST="${{ inputs.aws_account_id }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+          IMAGE_URI="${REGISTRY_HOST}/${{ inputs.repository }}:${{ inputs.image_tag }}"
+          echo "🎯 Constructed image URI from repository and tag"
+        fi
+
+        echo "📦 Image URI: $IMAGE_URI"
+        echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+    - name: Validate Lambda function
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v aws >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+          echo "❌ AWS CLI and jq are required on the runner"
+          exit 1
+        fi
+
+        echo "🔍 Validating Lambda function..."
+        if ! CFG_JSON=$(aws lambda get-function-configuration \
+          --function-name "${{ inputs.function_name }}" \
+          --region "${{ inputs.aws_region }}" \
+          --output json 2>/dev/null); then
+          echo "❌ Lambda function not found: ${{ inputs.function_name }}"
+          echo "   Check function name and region are correct"
+          exit 1
+        fi
+
+        PKG=$(echo "$CFG_JSON" | jq -r '.PackageType // "Zip"')
+        if [[ "$PKG" != "Image" ]]; then
+          echo "❌ Function package type is '$PKG'"
+          echo "   This action only supports container-based functions (PackageType=Image)"
+          exit 1
+        fi
+
+        STATE=$(echo "$CFG_JSON" | jq -r '.State // "Active"')
+        if [[ "$STATE" != "Active" ]]; then
+          echo "⚠️  Function state is '$STATE' — proceeding; waiter will ensure it becomes Active"
+        else
+          echo "✅ Lambda function is ready for update"
+        fi
 
     - name: Update Lambda function code
-      id: update
+      id: update_code
       shell: bash
       run: |
-        set -e
-        UPDATE_RESPONSE=$(aws lambda update-function-code \
+        set -euo pipefail
+
+        IMAGE_URI="${{ steps.resolve_image.outputs.image_uri }}"
+        FUNCTION_NAME="${{ inputs.function_name }}"
+
+        echo "🚀 Updating Lambda function: $FUNCTION_NAME"
+        echo "📦 New image: $IMAGE_URI"
+
+        if ! RESP=$(aws lambda update-function-code \
           --function-name "$FUNCTION_NAME" \
           --image-uri "$IMAGE_URI" \
-          --region "$AWS_REGION" \
-          --output json)
+          --region "${{ inputs.aws_region }}" \
+          --output json 2>&1); then
+          echo "❌ Failed to update Lambda function"
+          echo "$RESP"
+          exit 1
+        fi
 
-        echo "$UPDATE_RESPONSE"
-        echo "last_modified=$(echo "$UPDATE_RESPONSE" | jq -r '.LastModified')" \
-          >> $GITHUB_OUTPUT
+        echo "✅ Update request accepted"
 
-    - name: Wait for update completion
+        FUNCTION_ARN=$(echo "$RESP" | jq -r '.FunctionArn')
+        CODE_SHA256=$(echo "$RESP" | jq -r '.CodeSha256')
+        LAST_MODIFIED=$(echo "$RESP" | jq -r '.LastModified')
+
+        echo "function_arn=$FUNCTION_ARN"   >> "$GITHUB_OUTPUT"
+        echo "code_sha256=$CODE_SHA256"     >> "$GITHUB_OUTPUT"
+        echo "last_modified=$LAST_MODIFIED" >> "$GITHUB_OUTPUT"
+
+    - name: Wait for function to become Active
       if: inputs.wait_for_update == 'true'
       shell: bash
       run: |
-        echo "⏳ Waiting for Lambda function update to complete..."
-        aws lambda wait function-updated \
-          --function-name "$FUNCTION_NAME" \
-          --region "$AWS_REGION"
-        echo "✅ Update completed"
+        set -euo pipefail
+
+        echo "⏳ Waiting until function is Active..."
+        aws lambda wait function-active-v2 \
+          --function-name "${{ inputs.function_name }}" \
+          --region "${{ inputs.aws_region }}"
+
+        echo "✅ Function is Active"
 
     - name: Summary
+      if: always() && inputs.show_summary == 'true'
       shell: bash
       run: |
-        echo "## 🚀 Lambda Update Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- Function: $FUNCTION_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- Image URI: $IMAGE_URI" >> $GITHUB_STEP_SUMMARY
-        echo "- Last Modified: ${{ steps.update.outputs.last_modified }}" \
-          >> $GITHUB_STEP_SUMMARY
+        set -euo pipefail
+
+        STATUS_ICON="❌"
+        if [[ "${{ steps.update_code.outcome }}" == "success" ]]; then
+          STATUS_ICON="✅"
+        fi
+
+        LIMIT="${{ inputs.summary_limit }}"
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+
+        {
+          echo "## 🚀 Lambda Update ${STATUS_ICON}"
+          echo "- **Function:** \`${{ inputs.function_name }}\`"
+          echo "- **Region:** \`${{ inputs.aws_region }}\`"
+          echo "- **Image:** \`${{ steps.resolve_image.outputs.image_uri || 'N/A' }}\`"
+          if [[ "${{ steps.update_code.outcome }}" == "success" ]]; then
+            echo "- **Function ARN:** \`${{ steps.update_code.outputs.function_arn || 'N/A' }}\`"
+            echo "- **Code SHA256:** \`${{ steps.update_code.outputs.code_sha256 || 'N/A' }}\`"
+            echo "- **Last Modified:** \`${{ steps.update_code.outputs.last_modified || 'N/A' }}\`"
+            echo "- **Waited for Active:** \`${{ inputs.wait_for_update }}\`"
+          else
+            echo "- **Status:** Update failed — check logs above"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

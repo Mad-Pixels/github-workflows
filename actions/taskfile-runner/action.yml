@@ -1,22 +1,41 @@
 ---
 name: Task Runner
-description: Run Taskfile task using specified version and env variables
+description: Invoke Taskfile commands
 
 inputs:
   command:
-    description: 'Task command to run (e.g. "build" or "lint")'
+    description: 'Task command to run for invoke'
     required: true
   vars:
-    description: 'Optional environment variables in format key:value,key:value'
+    description: 'Envs for command, format: (key=value,key=value)'
     required: false
   dir:
-    description: 'Working directory inside the project'
+    description: 'Working directory'
     required: false
     default: '.'
   version:
-    description: 'Task binary version to use'
+    description: 'Taskfile version'
     required: false
     default: '3.44.1'
+  show_summary:
+    description: 'Print summary with task output in job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of output lines to show in summary'
+    required: false
+    default: '250'
+
+outputs:
+  task_version:
+    description: 'Installed Task version'
+    value: ${{ steps.install.outputs.version }}
+  task_output:
+    description: 'Task command output'
+    value: ${{ steps.run.outputs.output }}
+  task_command:
+    description: 'Executed task command'
+    value: ${{ inputs.command }}
 
 runs:
   using: composite
@@ -24,51 +43,177 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Detect architecture and install Task binary
+    - name: Validate Taskfile exists
+      shell: bash
+      working-directory: ${{ inputs.dir }}
+      run: |
+        set -euo pipefail
+        if [[ ! -f "Taskfile.yml" && ! -f "Taskfile.yaml" ]]; then
+          echo "❌ No Taskfile found in ${{ inputs.dir }}"
+          echo "Expected: Taskfile.yml or Taskfile.yaml"
+          exit 1
+        fi
+        echo "✅ Taskfile found"
+
+    - name: Detect architecture
+      id: arch
       shell: bash
       run: |
         set -euo pipefail
-
         ARCH=$(uname -m)
         case "$ARCH" in
           x86_64) ARCH="amd64" ;;
-          aarch64) ARCH="arm64" ;;
+          aarch64|arm64) ARCH="arm64" ;;
           *) echo "❌ Unsupported architecture: $ARCH" && exit 1 ;;
         esac
+        echo "arch=$ARCH" >> "$GITHUB_OUTPUT"
+        echo "Using arch: $ARCH"
 
+    - name: Cache Task binary
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/task
+        key: task-${{ inputs.version }}-${{ steps.arch.outputs.arch }}
+        restore-keys: |
+          task-${{ inputs.version }}-
+          task-
+
+    - name: Download Task binary
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
         VERSION="${{ inputs.version }}"
+        ARCH="${{ steps.arch.outputs.arch }}"
         echo "⬇️  Downloading Task v$VERSION for $ARCH..."
 
-        curl -sL "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz" \
-          | tar -xz -C /tmp
+        TMPDIR="$(mktemp -d)"; trap 'rm -rf "$TMPDIR"' EXIT
+        mkdir -p "$HOME/.cache/task"
 
-        sudo mv /tmp/task /usr/local/bin/task
-        sudo chmod +x /usr/local/bin/task
+        BASE="https://github.com/go-task/task/releases/download"
+        FILE="task_linux_${ARCH}.tar.gz"
+        URL="${BASE}/v${VERSION}/${FILE}"
+        curl -fsSLo "$TMPDIR/task.tgz" "$URL"
+        tar -xzf "$TMPDIR/task.tgz" -C "$TMPDIR"
 
-        echo "✅ Installed task binary:"
-        task --version
+        TASK_BIN="$(find "$TMPDIR" -maxdepth 3 -type f -name task -perm -111 -print -quit || true)"
+        if [[ -z "$TASK_BIN" ]]; then
+          echo "❌ Task binary not found in archive"
+          exit 1
+        fi
+
+        install -m 0755 "$TASK_BIN" "$HOME/.cache/task/task-$VERSION-$ARCH"
+        echo "✅ Downloaded to $HOME/.cache/task/task-$VERSION-$ARCH"
+
+    - name: Install Task binary
+      id: install
+      shell: bash
+      run: |
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
+        ARCH="${{ steps.arch.outputs.arch }}"
+        SRC="$HOME/.cache/task/task-$VERSION-$ARCH"
+        DEST="$HOME/.local/bin/task"
+
+        if [[ ! -x "$SRC" ]]; then
+          echo "❌ Task binary not found or not executable: $SRC"
+          exit 1
+        fi
+
+        mkdir -p "$(dirname "$DEST")"
+        install -m 0755 "$SRC" "$DEST"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+        VER_RAW="$("$DEST" --version 2>&1 | head -n1 | tr -d '\r')"
+        VER="$(printf '%s\n' "$VER_RAW" | grep -Eo 'v?[0-9]+(\.[0-9]+)+' | head -n1 || true)"
+        [[ -z "$VER" ]] && VER="$VER_RAW"
+        [[ "$VER" != v* ]] && VER="v$VER"
+
+        echo "✅ Installed task $VER"
+        echo "version=$VER" >> "$GITHUB_OUTPUT"
 
     - name: Export environment variables
       if: ${{ inputs.vars != '' }}
       shell: bash
       run: |
-        echo "🌐 Exporting env vars:"
-        echo "${{ inputs.vars }}" | tr ',' '\n' | while IFS=: read -r key value; do
-          echo "  - $key=$value"
-          echo "$key=$value" >> $GITHUB_ENV
+        set -euo pipefail
+        IFS=',' read -ra VARS <<< "${{ inputs.vars }}"
+        for var in "${VARS[@]}"; do
+          pair="$(echo "$var" | xargs)"
+          [[ -z "$pair" ]] && continue
+          key="${pair%%=*}"
+          value="${pair#*=}"
+          if [[ "$value" == "$key" ]]; then
+            echo "❌ Invalid var format: $pair (missing '=' separator)"
+            exit 1
+          fi
+          if [[ -z "$key" ]]; then
+            echo "❌ Invalid var (empty key): $pair"
+            exit 1
+          fi
+          delim="ENV_${key}_$RANDOM$RANDOM"
+          {
+            echo "$key<<$delim"
+            printf "%s\n" "$value"
+            echo "$delim"
+          } >> "$GITHUB_ENV"
         done
 
     - name: Run Taskfile command
+      id: run
       shell: bash
       working-directory: ${{ inputs.dir }}
       run: |
+        set -euo pipefail
         echo "🚀 Running task ${{ inputs.command }}"
-        task ${{ inputs.command }}
+
+        set +e
+        OUTPUT="$(task ${{ inputs.command }} 2>&1)"
+        EXIT_CODE=$?
+        set -e
+
+        printf "%s\n" "$OUTPUT"
+
+        DELIM="__TASK_OUTPUT_$(date +%s%N)__"
+        {
+          echo "output<<$DELIM"
+          printf "%s\n" "$OUTPUT"
+          echo "$DELIM"
+        } >> "$GITHUB_OUTPUT"
+
+        if [[ $EXIT_CODE -ne 0 ]]; then
+          echo "❌ Task failed with exit code $EXIT_CODE"
+          exit $EXIT_CODE
+        fi
+
+        echo "✅ Task completed successfully"
 
     - name: Task Runner Summary
+      if: inputs.show_summary != 'false'
       shell: bash
       run: |
-        echo "## 🧰 Task Runner Summary" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Command: \`${{ inputs.command }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Directory: \`${{ inputs.dir }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Task version: \`${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+        set -euo pipefail
+        OUT="${{ steps.run.outputs.output }}"
+        LIMIT="${{ inputs.summary_limit }}"
+        if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then LIMIT=250; fi
+
+        {
+          echo "## 🧰 Task Runner Summary"
+          echo "- Command: \`${{ inputs.command }}\`"
+          echo "- Directory: \`${{ inputs.dir }}\`"
+          echo "- Task version: \`${{ steps.install.outputs.version }}\`"
+
+          if [ -n "$OUT" ]; then
+            echo ""
+            TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
+            if [ "$TOTAL" -le "$LIMIT" ]; then
+              echo "### 🧾 Task output"
+            else
+              echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
+            fi
+            echo '```'
+            printf "%s\n" "$OUT" | awk -v lim="$LIMIT" 'NR<=lim{print}'
+            echo '```'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

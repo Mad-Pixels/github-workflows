@@ -1,0 +1,54 @@
+---
+name: Terraform Destroy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace:
+        description: 'Workspace to destroy'
+        required: true
+        type: string
+        default: staging
+      confirm:
+        description: 'Type TRUE to confirm destroy'
+        required: true
+        type: choice
+        options: [false, true]
+        default: false
+
+concurrency:
+  group: tf-destroy-${{ github.event.inputs.workspace }}
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    name: Destroy ${{ github.event.inputs.workspace }}
+    if: github.event.inputs.confirm == 'TRUE'
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.workspace }}
+    permissions:
+      contents: read
+    steps:
+      - name: Terraform Destroy
+        uses: Mad-Pixels/github-workflows/actions/terraform-runner@v1
+        with:
+          aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_region: eu-west-1
+
+          tf_dir: infra/
+          tf_workspace: ${{ github.event.inputs.workspace }}
+          tf_command: destroy
+          tf_vars: -var-file=${{ github.event.inputs.workspace }}.tfvars
+          tf_version: 1.8.5
+
+          backend_bucket: company-tf-state
+          backend_key: ${{ github.event.inputs.workspace }}/terraform.tfstate
+          backend_region: eu-west-1
+
+  guard:
+    name: Guard (no confirm)
+    if: github.event.inputs.confirm != 'TRUE'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "❌ Destroy blocked - set input 'confirm' to TRUE to proceed."

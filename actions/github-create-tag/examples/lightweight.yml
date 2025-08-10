@@ -1,0 +1,28 @@
+---
+name: Create tag (lightweight)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create (e.g., v1.0.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: manual-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create lightweight tag
+        uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
+        with:
+          tag: ${{ inputs.tag }}
+          lightweight: 'true'
+          token: ${{ secrets.PAT_TOKEN }}

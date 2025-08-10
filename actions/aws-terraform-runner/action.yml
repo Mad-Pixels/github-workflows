@@ -1,33 +1,33 @@
 ---
 name: 'Terraform Runner'
-description: 'Invoke terraform actions'
+description: 'Invoke AWS Terraform with S3 backend'
 
 inputs:
   aws_access_key_id:
-    description: 'AWS access key ID (optional if using OIDC)'
+    description: 'AWS access key ID'
     required: false
   aws_secret_access_key:
-    description: 'AWS secret access key (optional if using OIDC)'
+    description: 'AWS secret access key'
     required: false
   aws_region:
     description: 'AWS region'
     required: true
   role_to_assume:
-    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    description: 'AWS IAM role ARN to assume'
     required: false
 
   tf_dir:
     description: 'Path to Terraform config'
     required: true
   tf_workspace:
-    description: 'Terraform workspace (leave empty to use default)'
+    description: 'Terraform workspace'
     required: false
     default: ""
   tf_command:
-    description: 'Terraform command: [plan, apply, destroy]'
+    description: 'Terraform command: plan | apply | destroy'
     required: true
   tf_vars:
-    description: 'Extra `-var` flags (CLI)'
+    description: 'Extra CLI flags for terraform (e.g. -var="a=b" -var-file=prod.tfvars)'
     required: false
     default: ''
   tf_version:
@@ -42,8 +42,28 @@ inputs:
     description: 'S3 key for state'
     required: true
   backend_region:
-    description: 'Backend region'
+    description: 'Backend AWS region'
     required: true
+
+  show_summary:
+    description: 'Print summary with output in job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of plan output lines to show in summary'
+    required: false
+    default: '500'
+
+outputs:
+  terraform_command:
+    description: 'Executed Terraform command'
+    value: ${{ steps.collect.outputs.terraform_command }}
+  workspace:
+    description: 'Terraform workspace used'
+    value: ${{ steps.collect.outputs.workspace }}
+  terraform_version:
+    description: 'Detected Terraform version'
+    value: ${{ steps.collect.outputs.terraform_version }}
 
 runs:
   using: composite
@@ -53,17 +73,55 @@ runs:
       with:
         fetch-depth: 1
 
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ ! -d "${{ inputs.tf_dir }}" ]]; then
+          echo "❌ tf_dir not found: ${{ inputs.tf_dir }}"
+          exit 1
+        fi
+
+        case "${{ inputs.tf_command }}" in
+          plan|apply|destroy) ;;
+          *)
+            echo "❌ Unknown tf_command: ${{ inputs.tf_command }} (expected: plan|apply|destroy)"
+            exit 1
+            ;;
+        esac
+
+        for r in "${{ inputs.aws_region }}" "${{ inputs.backend_region }}"; do
+          if [[ ! "$r" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            echo "❌ Invalid AWS region: $r"
+            exit 1
+          fi
+        done
+
+        if [[ -z "${{ inputs.backend_bucket }}" || -z "${{ inputs.backend_key }}" ]]; then
+          echo "❌ backend_bucket/backend_key must be provided"
+          exit 1
+        fi
+
+        echo "✅ Inputs validated"
+
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_secret_key: ${{ inputs.aws_secret_access_key }}
         aws_access_key: ${{ inputs.aws_access_key_id }}
         role_to_assume: ${{ inputs.role_to_assume }}
         aws_region: ${{ inputs.aws_region }}
 
-    - name: Export AWS region for Terraform
+    - name: Export Terraform env
       shell: bash
-      run: echo "TF_VAR_aws_region=${{ inputs.aws_region }}" >> $GITHUB_ENV
+      run: |
+        set -euo pipefail
+        {
+          echo "TF_IN_AUTOMATION=1"
+          echo "TF_INPUT=0"
+          echo "TF_VAR_aws_region=${{ inputs.aws_region }}"
+        } >> "$GITHUB_ENV"
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
@@ -74,64 +132,135 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       shell: bash
       run: |
-        echo "bucket  = \"${{ inputs.backend_bucket }}\""  >  backend_aws.hcl
-        echo "key     = \"${{ inputs.backend_key }}\""     >> backend_aws.hcl
-        echo "region  = \"${{ inputs.backend_region }}\""  >> backend_aws.hcl
-        echo "encrypt = true"                              >> backend_aws.hcl
+        set -euo pipefail
+        cat > backend_aws.hcl <<'HCL'
+        bucket  = "${{ inputs.backend_bucket }}"
+        key     = "${{ inputs.backend_key }}"
+        region  = "${{ inputs.backend_region }}"
+        encrypt = true
+        HCL
 
     - name: Write backend.tf
       working-directory: ${{ inputs.tf_dir }}
       shell: bash
       run: |
-        echo 'terraform {'           >  backend.tf
-        echo '  backend "s3" {}'     >> backend.tf
-        echo '}'                     >> backend.tf
+        set -euo pipefail
+        cat > backend.tf <<'TF'
+        terraform {
+          backend "s3" {}
+        }
+        TF
 
     - name: Terraform Init
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
-      run: terraform init -input=false -reconfigure -backend-config=backend_aws.hcl
+      run: |
+        set -euo pipefail
+        terraform init -input=false -reconfigure -backend-config=backend_aws.hcl
 
     - name: Select or create workspace
       if: inputs.tf_workspace != ''
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
+        set -euo pipefail
         terraform workspace select "${{ inputs.tf_workspace }}" \
           || terraform workspace new "${{ inputs.tf_workspace }}"
         echo "Current workspace: $(terraform workspace show)"
 
-    - name: Run Terraform Validate
+    - name: Terraform Validate
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
-      run: terraform validate
+      run: |
+        set -euo pipefail
+        terraform validate
 
     - name: Run Terraform Command
+      id: tf-run
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
-        case "${{ inputs.tf_command }}" in
+        set -euo pipefail
+        CMD="${{ inputs.tf_command }}"
+        EXTRA='${{ inputs.tf_vars }}'
+        case "$CMD" in
           plan)
-            terraform plan -input=false ${{ inputs.tf_vars }}
+            echo "🚀 terraform plan"
+            terraform plan -input=false -lock-timeout=300s -out=tfplan $EXTRA
             ;;
           apply)
-            terraform apply -input=false -auto-approve ${{ inputs.tf_vars }}
+            echo "🚀 terraform apply"
+            terraform apply -input=false -auto-approve -lock-timeout=300s $EXTRA
             ;;
           destroy)
-            terraform destroy -input=false -auto-approve ${{ inputs.tf_vars }}
-            ;;
-          *)
-            echo "❌ Unknown tf_command: ${{ inputs.tf_command }}" >&2
-            exit 1
+            echo "🚀 terraform destroy"
+            terraform destroy -input=false -auto-approve -lock-timeout=300s $EXTRA
             ;;
         esac
-    - name: Terraform Summary
-      shell: bash
-      run: |
-        WORKSPACE="${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}"
 
-        echo "## 🛠️ Terraform Execution Summary" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Command: \`${{ inputs.tf_command }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Directory: \`${{ inputs.tf_dir }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Workspace: \`$WORKSPACE\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Terraform version: \`${{ inputs.tf_version }}\`" >> "$GITHUB_STEP_SUMMARY"
+    - name: Upload plan artifact
+      if: inputs.tf_command == 'plan'
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraform-plan
+        path: ${{ inputs.tf_dir }}/tfplan
+        if-no-files-found: error
+
+    - name: Collect outputs
+      id: collect
+      shell: bash
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        set -euo pipefail
+        CMD="${{ inputs.tf_command }}"
+
+        WS_IN="${{ inputs.tf_workspace }}"
+        if [[ -n "$WS_IN" ]]; then
+          WS="$WS_IN"
+        else
+          WS="$(terraform workspace show 2>/dev/null || echo default)"
+        fi
+
+        TFV="$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version":"\([^"]*\)".*/\1/p')"
+        [[ -z "$TFV" ]] && TFV="${{ inputs.tf_version }}"
+
+        {
+          echo "terraform_command=$CMD"
+          echo "workspace=$WS"
+          echo "terraform_version=$TFV"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Terraform Summary
+      if: inputs.show_summary != 'false'
+      shell: bash
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        set -euo pipefail
+
+        WORKSPACE="${{ steps.collect.outputs.workspace }}"
+        TFV="${{ steps.collect.outputs.terraform_version }}"
+
+        LIMIT_RAW="${{ inputs.summary_limit }}"
+        if ! [[ "$LIMIT_RAW" =~ ^[0-9]+$ ]]; then LIMIT=250; else LIMIT="$LIMIT_RAW"; fi
+
+        {
+          echo "## 🛠️ Terraform Execution Summary"
+          echo "- **Command:** \`${{ inputs.tf_command }}\`"
+          echo "- **Directory:** \`${{ inputs.tf_dir }}\`"
+          echo "- **Workspace:** \`$WORKSPACE\`"
+          echo "- **Terraform version:** \`$TFV\`"
+          echo "- **Backend:** S3 \`${{ inputs.backend_bucket }}:${{ inputs.backend_key }}\`"
+          echo "  in \`${{ inputs.backend_region }}\`"
+          echo "- **AWS region (vars):** \`${{ inputs.aws_region }}\`"
+
+          if [[ "${{ inputs.tf_command }}" == "plan" && -f "tfplan" ]]; then
+            echo ""
+            TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
+            echo "### 📄 Plan (first ${LIMIT} lines${TOTAL_LINES:+ of ${TOTAL_LINES}})"
+            terraform show -no-color tfplan | sed -n "1,${LIMIT}p"
+            if [[ -n "$TOTAL_LINES" && "$TOTAL_LINES" -gt "$LIMIT" ]]; then
+              echo ""
+              echo "_…truncated, total lines: $TOTAL_LINES_"
+            fi
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

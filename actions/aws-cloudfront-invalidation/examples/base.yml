@@ -1,0 +1,20 @@
+---
+name: Invalidate CloudFront Cache
+
+on:
+  workflow_dispatch:
+
+jobs:
+  invalidate:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Invalidate CloudFront Cache
+        uses: Mad-Pixels/github-workflows/actions/cloudfront-invalidation@v1
+        with:
+          aws_region: us-east-1
+          role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC
+          distribution_id: E1234567890ABC
+          paths: "/* /index.html /assets/*"

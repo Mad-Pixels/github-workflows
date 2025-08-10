@@ -1,0 +1,33 @@
+---
+name: Create tag from branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create'
+        required: true
+        type: string
+      branch:
+        description: 'Branch to tag from (must exist on remote)'
+        required: true
+        type: string
+        default: 'release/1.x'
+
+concurrency:
+  group: manual-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create tag from non-default branch
+        uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
+        with:
+          tag: ${{ inputs.tag }}
+          branch: ${{ inputs.branch }}
+          token: ${{ secrets.PAT_TOKEN }}

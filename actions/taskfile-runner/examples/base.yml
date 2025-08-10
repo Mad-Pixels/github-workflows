@@ -1,0 +1,28 @@
+---
+name: Invoke Taskfile commands
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - id: task
+        uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1
+        with:
+          command: build
+          dir: ./app
+          # Comma-separated key=value pairs
+          # Values may include '=' and newlines, but **not commas**
+          vars: |
+            NODE_ENV=production,VERSION=1.2.3,NOTES=Line1\nLine2
+
+      - name: Use outputs
+        run: |
+          echo "Task version:  ${{ steps.task.outputs.task_version }}"
+          echo "Task output:"
+          printf "%s\n" "${{ steps.task.outputs.task_output }}"
