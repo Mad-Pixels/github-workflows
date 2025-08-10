@@ -210,5 +210,17 @@ runs:
           echo "- Command: \`${{ inputs.command }}\`"
           echo "- Directory: \`${{ inputs.dir }}\`"
           echo "- Task version: \`${{ steps.install.outputs.version }}\`"
+
+          if [ -s "$TMP" ]; then
+            echo ""
+          if [ "$LINES" -le "$LIMIT" ]; then
+            echo "### 🧾 Task output"
+          else
+            echo "### 🧾 Task output (first ${LIMIT} lines of ${LINES})"
+          fi
+            echo '```'
+            sed -n "1,${LIMIT}p" "$TMP"
+            echo '```'
+          fi
         } >> "$GITHUB_STEP_SUMMARY"
 
