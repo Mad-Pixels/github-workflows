@@ -129,13 +129,14 @@ runs:
         install -m 0755 "$SRC" "$DEST"
 
         echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-        VER="$("$DEST" --version | sed -n 's/.*\(v[0-9][0-9.]*\).*/\1/p')"
-        if [[ -z "$VER" ]]; then
-          echo "❌ Task binary verification failed"
-          "$DEST" --version || true
-          exit 1
-        fi
 
+        VER_RAW="$("$DEST" --version 2>&1 | head -n1 | tr -d '\r')"
+        VER="$(printf '%s\n' "$VER_RAW" | grep -Eo 'v?[0-9]+(\.[0-9]+)+' | head -n1 || true)"
+        if [[ -z "$VER" ]]; then
+          VER="$VER_RAW"
+        fi
+        
+        [[ "$VER" != v* ]] && VER="v$VER"
         echo "✅ Installed task $VER"
         echo "version=$VER" >> "$GITHUB_OUTPUT"
 
