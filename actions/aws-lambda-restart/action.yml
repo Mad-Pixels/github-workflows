@@ -39,6 +39,15 @@ inputs:
     required: false
     default: 'true'
 
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of lines to show in summary (kept for consistency)'
+    required: false
+    default: '250'
+
 outputs:
   function_arn:
     description: 'Lambda function ARN'
@@ -190,7 +199,7 @@ runs:
         echo "✅ Function is Active"
 
     - name: Summary
-      if: always()
+      if: always() && inputs.show_summary == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -200,15 +209,18 @@ runs:
           STATUS_ICON="✅"
         fi
 
+        LIMIT="${{ inputs.summary_limit }}"
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+
         {
           echo "## 🚀 Lambda Update ${STATUS_ICON}"
           echo "- **Function:** \`${{ inputs.function_name }}\`"
           echo "- **Region:** \`${{ inputs.aws_region }}\`"
-          # echo "- **Image:** \`${{ steps.resolve_image.outputs.image_uri }}\`"
+          echo "- **Image:** \`${{ steps.resolve_image.outputs.image_uri || 'N/A' }}\`"
           if [[ "${{ steps.update_code.outcome }}" == "success" ]]; then
-            # echo "- **Function ARN:** \`${{ steps.update_code.outputs.function_arn }}\`"
-            echo "- **Code SHA256:** \`${{ steps.update_code.outputs.code_sha256 }}\`"
-            echo "- **Last Modified:** \`${{ steps.update_code.outputs.last_modified }}\`"
+            echo "- **Function ARN:** \`${{ steps.update_code.outputs.function_arn || 'N/A' }}\`"
+            echo "- **Code SHA256:** \`${{ steps.update_code.outputs.code_sha256 || 'N/A' }}\`"
+            echo "- **Last Modified:** \`${{ steps.update_code.outputs.last_modified || 'N/A' }}\`"
             echo "- **Waited for Active:** \`${{ inputs.wait_for_update }}\`"
           else
             echo "- **Status:** Update failed — check logs above"

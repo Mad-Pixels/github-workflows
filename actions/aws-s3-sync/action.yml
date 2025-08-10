@@ -43,6 +43,15 @@ inputs:
     required: false
     default: 'true'
 
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of output lines to show in summary (kept for consistency)'
+    required: false
+    default: '250'
+
 outputs:
   files_uploaded:
     description: 'Number of uploaded files'
@@ -234,7 +243,7 @@ runs:
         echo "sync_duration=$SYNC_DURATION" >> "$GITHUB_OUTPUT"
 
     - name: Summary
-      if: always()
+      if: always() && inputs.show_summary == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -244,11 +253,15 @@ runs:
         BYTES="${{ steps.analyze.outputs.total_size || 0 }}"
         MB=$(awk "BEGIN {printf \"%.2f\", (${BYTES})/1024/1024}")
 
+        # limit is kept for API parity with other actions
+        LIMIT="${{ inputs.summary_limit }}"
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+
         {
           echo "## ☁️ S3 Sync ${STATUS_ICON}"
           echo "- **Bucket:** \`${{ inputs.bucket_name }}\`"
           echo "- **Source:** \`${{ inputs.source_dir }}\`"
-          # echo "- **Target:** \`${{ steps.url.outputs.s3_url }}\`"
+          echo "- **Target:** \`${{ steps.url.outputs.s3_url }}\`"
           echo "- **Region:** \`${{ inputs.aws_region }}\`"
           echo "- **Delete removed:** \`${{ inputs.delete_removed }}\`"
           echo "- **Cache-Control:** \`${{ inputs.cache_control || 'N/A' }}\`"

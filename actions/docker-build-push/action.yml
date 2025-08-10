@@ -48,6 +48,15 @@ inputs:
     required: false
     default: 'Dockerfile'
 
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of output lines to show in summary (kept for consistency)'
+    required: false
+    default: '250'
+
 outputs:
   image_digest:
     description: 'Pushed image manifest-list digest (sha256:...)'
@@ -266,7 +275,7 @@ runs:
         echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
     - name: Summary
-      if: always()
+      if: always() && inputs.show_summary == 'true'
       shell: bash
       env:
         BUILD_ARGS_JSON: ${{ inputs.build_args }}
@@ -275,6 +284,7 @@ runs:
         REGISTRY: ${{ inputs.registry }}
         REPO: ${{ inputs.repository }}
         TAG: ${{ inputs.tag }}
+        LIMIT: ${{ inputs.summary_limit }}
       run: |
         set -euo pipefail
 
@@ -282,6 +292,8 @@ runs:
         if [[ "${{ steps.build.outcome }}" == "success" ]]; then
           STATUS_ICON="✅"
         fi
+
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
 
         if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"

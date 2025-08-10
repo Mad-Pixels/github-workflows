@@ -43,6 +43,8 @@ jobs:
 | `tag_name`        | ❌ No        | Tag name to validate; if empty, validates current `HEAD`     | ` `         |
 | `commit_sha`      | ❌ No        | Explicit commit SHA to validate (overrides `tag_name/HEAD`)  | ` `         |
 | `fail_on_invalid` | ❌ No        | Fail the action if not reachable ('true'/'false')            | ` `         |
+| `show_summary`    | ❌ No        | Print summary with task output in job summary                | `true`      |
+| `summary_limit`   | ❌ No        | Max number of output lines to show in summary                | `250`       |
 
 ## 📤 Outputs
 | **Name**        | **Description**                                                              |

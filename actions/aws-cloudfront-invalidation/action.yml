@@ -33,6 +33,15 @@ inputs:
     required: false
     default: 'false'
 
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of lines (paths) to show in summary'
+    required: false
+    default: '250'
+
 outputs:
   invalidation_id:
     description: 'ID of the created invalidation'
@@ -137,8 +146,8 @@ runs:
         ID=$(echo "$RESP" | jq -r '.Invalidation.Id')
         STATUS=$(echo "$RESP" | jq -r '.Invalidation.Status')
 
-        echo "invalidation_id=$ID"       >> "$GITHUB_OUTPUT"
-        echo "status=$STATUS"            >> "$GITHUB_OUTPUT"
+        echo "invalidation_id=$ID"          >> "$GITHUB_OUTPUT"
+        echo "status=$STATUS"               >> "$GITHUB_OUTPUT"
         echo "caller_reference=$CALLER_REF" >> "$GITHUB_OUTPUT"
 
         echo "✅ Invalidation created: $ID (status: $STATUS)"
@@ -177,25 +186,51 @@ runs:
         fi
 
     - name: Summary
-      if: always()
+      if: always() && inputs.show_summary == 'true'
       shell: bash
       run: |
         set -euo pipefail
 
         STATUS_ICON="❌"
-        [[ "${{ steps.invalidate.outputs.invalidation_id }}" != "" ]] && STATUS_ICON="✅"
+        [[ -n "${{ steps.invalidate.outputs.invalidation_id }}" ]] && STATUS_ICON="✅"
 
+        DIST="${{ inputs.distribution_id }}"
         ID="${{ steps.invalidate.outputs.invalidation_id }}"
-        CF_LINK="https://console.aws.amazon.com/cloudfront/v4/home#/distributions/${DIST}/invalidations/${ID}"
+        CF_LINK=""
+        if [[ -n "$DIST" && -n "$ID" ]]; then
+          CF_LINK="https://console.aws.amazon.com/cloudfront/v4/home#/distributions/${DIST}/invalidations/${ID}"
+        fi
+
+        LIMIT="${{ inputs.summary_limit }}"
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+
+        PATHS_RAW="${{ inputs.paths }}"
+        mapfile -t P_ARR < <(printf '%s\n' $PATHS_RAW)
+        TOTAL="${#P_ARR[@]}"
+        SHOW="$LIMIT"; (( TOTAL < LIMIT )) && SHOW="$TOTAL"
 
         {
           echo "## 📊 CloudFront Invalidation ${STATUS_ICON}"
           echo "- **Invalidation ID:** \`${ID:-N/A}\`"
           echo "- **Status:** \`${{ steps.invalidate.outputs.status || 'N/A' }}\`"
-          echo "- **Paths:** \`${{ inputs.paths }}\`"
           echo "- **CallerReference:** \`${{ steps.invalidate.outputs.caller_reference || 'auto' }}\`"
-          if [[ -n "$ID" ]]; then
+          echo "- **Distribution:** \`${DIST}\`"
+          if [[ -n "$CF_LINK" ]]; then
             echo "- **Console:** ${CF_LINK}"
+          fi
+
+          echo ""
+          if (( TOTAL > 0 )); then
+            if (( TOTAL <= LIMIT )); then
+              echo "### Paths"
+            else
+              echo "### Paths (first ${LIMIT} of ${TOTAL})"
+            fi
+            echo '```'
+            for ((i=0;i<SHOW;i++)); do
+              printf '%s\n' "${P_ARR[i]}"
+            done
+            echo '```'
           fi
 
           echo ""

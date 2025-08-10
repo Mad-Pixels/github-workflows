@@ -28,6 +28,14 @@ inputs:
     description: 'Create lightweight tag (ignores message)'
     required: false
     default: 'false'
+  show_summary:
+    description: 'Print summary in the job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of message lines to show in summary'
+    required: false
+    default: '250'
 
 outputs:
   tag_sha:
@@ -72,14 +80,14 @@ runs:
           exit 1
         fi
 
-        if [[ ! "$TAG_NAME" =~ $TAG_FORMAT ]]; then
-          echo "❌ Invalid tag format: $TAG_NAME"
-          echo "Expected: $TAG_FORMAT"
+        if [ -z "$TAG_NAME" ]; then
+          echo "❌ Tag name cannot be empty"
           exit 1
         fi
 
-        if [ -z "$TAG_NAME" ]; then
-          echo "❌ Tag name cannot be empty"
+        if [[ ! "$TAG_NAME" =~ $TAG_FORMAT ]]; then
+          echo "❌ Invalid tag format: $TAG_NAME"
+          echo "Expected: $TAG_FORMAT"
           exit 1
         fi
 
@@ -196,9 +204,14 @@ runs:
         fi
 
     - name: Summary
+      if: always() && inputs.show_summary == 'true'
       shell: bash
+      env:
+        LIMIT: ${{ inputs.summary_limit }}
       run: |
         set -euo pipefail
+
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
 
         TYPE="Annotated"
         if [ "${LIGHTWEIGHT}" = "true" ]; then
@@ -214,11 +227,11 @@ runs:
           echo "- **Force:** ${FORCE_CREATE}"
           echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})"
 
-          if [ -n "${TAG_MESSAGE}" ]; then
+          if [ -n "${TAG_MESSAGE// }" ]; then
             echo ""
             echo "### Message"
             echo '```'
-            printf "%s\n" "${TAG_MESSAGE}"
+            printf "%s\n" "${TAG_MESSAGE}" | awk -v lim="$LIMIT" 'NR<=lim{print}'
             echo '```'
           fi
 

@@ -53,7 +53,7 @@ jobs:
 |------------------|--------------|-----------------------------------------------------------------------------------------------------|---------------------------------------------|
 | `docker_user`    | ✅ Yes       | Registry username (Docker Hub by default)                                                           | -                                           |
 | `docker_token`   | ✅ Yes       | Registry access token / password                                                                    | -                                           |
-| `repository`     | ✅ Yes       | Image repository (e.g. `user/image` or `ghcr.io/org/image` with non-default registry)              | -                                           |
+| `repository`     | ✅ Yes       | Image repository (e.g. `user/image` or `ghcr.io/org/image` with non-default registry)               | -                                           |
 | `tag`            | ✅ Yes       | Image tag (e.g. `v1.0.0`, `sha`)                                                                    | -                                           |
 | `registry`       | ❌ No        | Registry host (e.g. `docker.io`, `ghcr.io`)                                                         | `docker.io`                                 |
 | `push_latest`    | ❌ No        | Also tag and push `:latest` (`true`/`false`)                                                        | `false`                                     |
@@ -62,6 +62,8 @@ jobs:
 | `artifact_name`  | ❌ No        | If set, downloads artifact and uses it as build context                                             | `''`                                        |
 | `context_path`   | ❌ No        | Build context path (relative to repo root or artifact root)                                         | `.`                                         |
 | `dockerfile_path`| ❌ No        | Path to Dockerfile (relative to `context_path`)                                                     | `Dockerfile`                                |
+| `show_summary`   | ❌ No        | Print summary with task output in job summary                                                       | `true`                                      |
+| `summary_limit`  | ❌ No        | Max number of output lines to show in summary                                                       | `250`                                       |
 
 ## 📤 Outputs
 | **Name**        | **Description**                          |

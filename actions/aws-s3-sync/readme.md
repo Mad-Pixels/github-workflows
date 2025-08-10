@@ -62,6 +62,8 @@ jobs:
 | `exclude_patterns`       | ❌ No        | Space‑separated exclude patterns passed to `aws s3 sync --exclude`              | `.git/* .github/* .gitignore .gitattributes` |
 | `cache_control`          | ❌ No        | Value for `Cache-Control` header applied to uploads                             | -                                            |
 | `content_type_detection` | ❌ No        | Enable automatic content-type guessing based on file extension (true/false)     | true                                         |
+| `show_summary`           | ❌ No        | Print summary with task output in job summary                                   | `true`                                       |
+| `summary_limit`          | ❌ No        | Max number of output lines to show in summary                                   | `250`                                        |
 
 ## 📤 Outputs
 | **Name**          | **Description**                                 |

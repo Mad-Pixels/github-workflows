@@ -42,13 +42,15 @@ jobs:
 ## 📥 Inputs
 | **Name**           | **Required** | **Description**                                                                                         | **Default** |
 |--------------------|--------------|---------------------------------------------------------------------------------------------------------|-------------|
-| `aws_region`       | ✅ Yes       | AWS region (used by the CLI)                                                                             | -           |
+| `aws_region`       | ✅ Yes       | AWS region (used by the CLI)                                                                            | -           |
 | `distribution_id`  | ✅ Yes       | CloudFront distribution ID (format: E + 13 alphanumeric chars, e.g. `E1234567890ABC`)                   | -           |
-| `aws_access_key`   | ❌ No        | AWS access key ID (optional if using OIDC)                                                               | -           |
-| `aws_secret_key`   | ❌ No        | AWS secret access key (optional if using OIDC)                                                           | -           |
-| `role_to_assume`   | ❌ No        | AWS IAM role ARN to assume (OIDC)                                                                        | -           |
-| `paths`            | ❌ No        | Space‑separated list of paths to invalidate (must start with `/`; max 1000 entries; wildcards allowed)   | `/*`        |
-| `caller_reference` | ❌ No        | Custom caller reference for idempotency (auto‑generated if not provided)                                 | -           |
+| `aws_access_key`   | ❌ No        | AWS access key ID (optional if using OIDC)                                                              | -           |
+| `aws_secret_key`   | ❌ No        | AWS secret access key (optional if using OIDC)                                                          | -           |
+| `role_to_assume`   | ❌ No        | AWS IAM role ARN to assume (OIDC)                                                                       | -           |
+| `paths`            | ❌ No        | Space‑separated list of paths to invalidate (must start with `/`; max 1000 entries; wildcards allowed)  | `/*`        |
+| `caller_reference` | ❌ No        | Custom caller reference for idempotency (auto‑generated if not provided)                                | -           |
+| `show_summary`     | ❌ No        | Print summary with task output in job summary                                                           | `true`      |
+| `summary_limit`    | ❌ No        | Max number of output lines to show in summary                                                           | `250`       |
 
 ## 📤 Outputs
 | **Name**          | **Description**                   |

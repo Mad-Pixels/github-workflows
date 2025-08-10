@@ -56,6 +56,8 @@ jobs:
 | `repository`             | ❌ No        | ECR repository name (used if `image_uri` not provided)                               | -           |
 | `image_tag`              | ❌ No        | ECR image tag (used with `repository`)                                               | `latest`    |
 | `wait_for_update`        | ❌ No        | Wait for function update to complete (`true`/`false`)                                | `true`      |
+| `show_summary`           | ❌ No        | Print summary with task output in job summary                                        | `true`      |
+| `summary_limit`          | ❌ No        | Max number of output lines to show in summary                                        | `250`       |
 
 ## 📤 Outputs
 | **Name**         | **Description**                         |
