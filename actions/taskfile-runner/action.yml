@@ -190,7 +190,6 @@ runs:
         set -euo pipefail
         OUT="${{ steps.run.outputs.output }}"
         LIMIT="${{ inputs.summary_limit }}"
-        # sane fallback if user passed junk
         if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then LIMIT=250; fi
 
         {
