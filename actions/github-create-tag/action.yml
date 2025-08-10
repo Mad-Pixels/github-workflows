@@ -1,13 +1,13 @@
 ---
 name: 'Tag Creator'
-description: 'Create and manage git tags with validation'
+description: 'Create git tags with validation'
 
 inputs:
   tag:
-    description: 'Tag to create (e.g., v1.0.0)'
+    description: 'Tag to create'
     required: true
   token:
-    description: 'GitHub token for authentication'
+    description: 'GitHub token'
     required: true
   force:
     description: 'Force overwrite existing tag'
@@ -46,12 +46,21 @@ runs:
     - name: Export inputs as env
       shell: bash
       run: |
-        echo "TAG_NAME=${{ inputs.tag }}" >> $GITHUB_ENV
-        echo "BRANCH_NAME=${{ inputs.branch }}" >> $GITHUB_ENV
-        echo "FORCE_CREATE=${{ inputs.force }}" >> $GITHUB_ENV
-        echo "LIGHTWEIGHT=${{ inputs.lightweight }}" >> $GITHUB_ENV
-        echo "TAG_MESSAGE=${{ inputs.message }}" >> $GITHUB_ENV
-        echo "TAG_FORMAT=${{ inputs.tag_format }}" >> $GITHUB_ENV
+        set -euo pipefail
+
+        echo "TAG_NAME=${{ inputs.tag }}" >> "$GITHUB_ENV"
+        echo "BRANCH_NAME=${{ inputs.branch }}" >> "$GITHUB_ENV"
+        echo "FORCE_CREATE=${{ inputs.force }}" >> "$GITHUB_ENV"
+        echo "LIGHTWEIGHT=${{ inputs.lightweight }}" >> "$GITHUB_ENV"
+        echo "TAG_FORMAT=${{ inputs.tag_format }}" >> "$GITHUB_ENV"
+
+        DELIM="MSG_$(date +%s%N)"
+        {
+          echo "TAG_MESSAGE<<$DELIM"
+          printf "%s" "${{ inputs.message }}"
+          echo
+          echo "$DELIM"
+        } >> "$GITHUB_ENV"
 
     - name: Validate inputs
       shell: bash
@@ -79,8 +88,8 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        ref: ${{ inputs.branch }}
         fetch-depth: 0
+        ref: ${{ inputs.branch }}
         token: ${{ inputs.token }}
 
     - name: Verify branch
@@ -89,7 +98,7 @@ runs:
         set -euo pipefail
         echo "Verifying branch $BRANCH_NAME"
 
-        if ! git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+        if ! git ls-remote --heads origin "refs/heads/$BRANCH_NAME" | grep -q "refs/heads/${BRANCH_NAME}$"; then
           echo "❌ Branch $BRANCH_NAME not found on remote"
           exit 1
         fi
@@ -117,6 +126,8 @@ runs:
     - name: Configure Git user
       shell: bash
       run: |
+        set -euo pipefail
+
         git config user.name "${{ github.actor }}"
         git config user.email "${{ github.actor }}@users.noreply.github.com"
 
@@ -137,14 +148,22 @@ runs:
 
         if [ "$TAG_EXISTS" = "true" ]; then
           echo "🗑️ Deleting existing tag..."
-          git tag -d "$TAG_NAME" || true
-          git push origin ":refs/tags/$TAG_NAME" || true
+
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            git tag -d "$TAG_NAME"
+            echo "✅ Local tag deleted"
+          fi
+          
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME$"; then
+            git push origin ":refs/tags/$TAG_NAME"
+            echo "✅ Remote tag deleted"
+          fi
         fi
 
         if [ "$LIGHTWEIGHT" = "true" ]; then
           git tag "$TAG_NAME"
           echo "✅ Created lightweight tag"
-        elif [ -n "$TAG_MESSAGE" ]; then
+        elif [ -n "${TAG_MESSAGE// /}" ]; then 
           printf "%s" "$TAG_MESSAGE" | git tag -a "$TAG_NAME" -F -
           echo "✅ Created annotated tag with message"
         else
@@ -159,6 +178,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+
         echo "⏳ Verifying remote tag exists..."
 
         ATTEMPTS=0
@@ -178,20 +198,31 @@ runs:
     - name: Summary
       shell: bash
       run: |
-        echo "## 🏷️ Tag Created" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag:** $TAG_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **SHA:** ${{ steps.create_tag.outputs.tag_sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branch:** $BRANCH_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Type:** $(
-          [ "$LIGHTWEIGHT" = "true" ] && echo "Lightweight" || echo "Annotated"
-        )" >> $GITHUB_STEP_SUMMARY
-        echo "- **Force:** $FORCE_CREATE" >> $GITHUB_STEP_SUMMARY
-        echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})" \
-          >> $GITHUB_STEP_SUMMARY
+        set -euo pipefail
 
-        if [ -n "$TAG_MESSAGE" ]; then
-          echo "- **Message:** $TAG_MESSAGE" >> $GITHUB_STEP_SUMMARY
+        TYPE="Annotated"
+        if [ "${LIGHTWEIGHT}" = "true" ]; then
+          TYPE="Lightweight"
         fi
 
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🎉 Tagging complete!" >> $GITHUB_STEP_SUMMARY
+        {
+          echo "## 🏷️ Tag Created"
+          echo "- **Tag:** ${TAG_NAME}"
+          echo "- **SHA:** ${{ steps.create_tag.outputs.tag_sha }}"
+          echo "- **Branch:** ${BRANCH_NAME}"
+          echo "- **Type:** ${TYPE}"
+          echo "- **Force:** ${FORCE_CREATE}"
+          echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})"
+
+          if [ -n "${TAG_MESSAGE}" ]; then
+            echo ""
+            echo "### Message"
+            echo '```'
+            printf "%s\n" "${TAG_MESSAGE}"
+            echo '```'
+          fi
+
+          echo ""
+          echo "🎉 Tagging complete!"
+        } >> "$GITHUB_STEP_SUMMARY"
+

@@ -1,46 +1,44 @@
-name: Sync Directory to S3
+name: Synk
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
-  sync-to-s3:
+  build:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site
+        run: |
+          mkdir -p dist && echo "hello" > dist/index.html
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
     permissions:
-      id-token: write   # required if using role_to_assume (OIDC)
+      id-token: write
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: ./artifact
 
-      # Example: build static site into ./dist (optional)
-      # - name: Build site
-      #   run: |
-      #     npm ci
-      #     npm run build
-
-      - name: Sync ./dist to S3 via OIDC
+      - name: Sync artifact/ to S3
         uses: Mad-Pixels/github-workflows/actions/s3-sync@v1
         with:
           aws_region: us-east-1
           role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC-Deploy
           bucket_name: my-static-site-bucket
-          source_dir: dist
+          source_dir: artifact
           bucket_prefix: web
           delete_removed: 'true'
-          exclude_patterns: ".git/* .github/* .DS_Store"
+          exclude_patterns: ".git/* .github/*"
           cache_control: "public, max-age=31536000, immutable"
 
-      # Example for static credentials instead of OIDC:
-      # - name: Sync using static keys
-      #   uses: Mad-Pixels/github-workflows/actions/s3-sync@v1
-      #   with:
-      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws_region: us-east-1
-      #     bucket_name: my-static-site-bucket
-      #     source_dir: dist
-      #     bucket_prefix: web
-      #     delete_removed: 'true'

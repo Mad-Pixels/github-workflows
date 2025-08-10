@@ -1,12 +1,9 @@
 # ⚡️ CloudFront Invalidation
-Create a CloudFront invalidation to purge cached content after deploys. Supports OIDC or static AWS credentials, multiple paths (space‑separated), optional custom caller reference, and rich summary output.
+Create a CloudFront invalidation 
 
 ## ✅ Features
 - Create invalidations for one or many paths (supports wildcards)
 - Auto‑generated caller reference (or provide your own)
-- OIDC role assumption or static AWS credentials
-- Input validation (distribution ID format, path count, path prefixes)
-- Summary output with invalidation ID, status, and paths
 
 ## 📖 Related Documentation
 - CloudFront Invalidation API: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html
@@ -15,8 +12,8 @@ Create a CloudFront invalidation to purge cached content after deploys. Supports
 
 ## 🚀 Prerequisites
 Your workflow must:
-- Run on `ubuntu-latest` with AWS CLI and `jq` available
-- Provide AWS credentials (static keys) or OIDC role assumption
+- Run on `ubuntu-latest`
+- Have access to AWS credentials or an assumable IAM role
 - Have a valid CloudFront distribution ID
 
 ## 🔧 Quick Example
@@ -45,11 +42,11 @@ jobs:
 ## 📥 Inputs
 | **Name**           | **Required** | **Description**                                                                                         | **Default** |
 |--------------------|--------------|---------------------------------------------------------------------------------------------------------|-------------|
+| `aws_region`       | ✅ Yes       | AWS region (used by the CLI)                                                                             | -           |
+| `distribution_id`  | ✅ Yes       | CloudFront distribution ID (format: E + 13 alphanumeric chars, e.g. `E1234567890ABC`)                   | -           |
 | `aws_access_key`   | ❌ No        | AWS access key ID (optional if using OIDC)                                                               | -           |
 | `aws_secret_key`   | ❌ No        | AWS secret access key (optional if using OIDC)                                                           | -           |
-| `aws_region`       | ✅ Yes       | AWS region (used by the CLI)                                                                             | -           |
 | `role_to_assume`   | ❌ No        | AWS IAM role ARN to assume (OIDC)                                                                        | -           |
-| `distribution_id`  | ✅ Yes       | CloudFront distribution ID (format: E + 13 alphanumeric chars, e.g. `E1234567890ABC`)                   | -           |
 | `paths`            | ❌ No        | Space‑separated list of paths to invalidate (must start with `/`; max 1000 entries; wildcards allowed)   | `/*`        |
 | `caller_reference` | ❌ No        | Custom caller reference for idempotency (auto‑generated if not provided)                                 | -           |
 
@@ -61,3 +58,4 @@ jobs:
 
 ## 📋 Examples
 [View example →](./examples/base.yml)
+

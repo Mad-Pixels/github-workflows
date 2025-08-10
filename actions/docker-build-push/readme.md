@@ -1,14 +1,11 @@
 # 🐳 Docker Build & Push.
-Build and push multi-platform Docker images. Supports Docker Hub (default) and custom registries, artifact-based contexts, build cache, and digest output.
+Build and push multi-platform Docker images. 
 
 ## ✅ Features
 - Multi-arch builds via Buildx + QEMU (`linux/amd64`, `linux/arm64`, etc.)
 - Push to Docker Hub or custom registry (`registry` input)
 - Optional `:latest` tagging (`push_latest`)
-- Use uploaded artifact as build context (CI-friendly)
-- JSON-driven build args (stable parsing with `jq`)
 - GitHub Actions cache for faster rebuilds
-- Emits manifest-list digest for downstream steps
 
 ## 📖 Related Documentation
 - Docker Buildx: https://docs.docker.com/build/buildx/
@@ -18,10 +15,12 @@ Build and push multi-platform Docker images. Supports Docker Hub (default) and c
 ## 🚀 Prerequisites
 Your workflow must:
 - Run on `ubuntu-latest` with Docker available
+- JSON-driven build args
 - Provide registry credentials (`docker_user`, `docker_token`)
 - If using artifact context: ensure the artifact is produced earlier in the workflow
 
 ## 🔧 Quick Example
+```yaml
 name: Build & Push Image
 
 on:
@@ -47,15 +46,16 @@ jobs:
           build_args: '{"VERSION":"${{ github.sha }}","NODE_ENV":"production"}'
           context_path: .
           dockerfile_path: Dockerfile
+```
 
 ## 📥 Inputs
 | **Name**         | **Required** | **Description**                                                                                     | **Default**                                 |
 |------------------|--------------|-----------------------------------------------------------------------------------------------------|---------------------------------------------|
 | `docker_user`    | ✅ Yes       | Registry username (Docker Hub by default)                                                           | -                                           |
 | `docker_token`   | ✅ Yes       | Registry access token / password                                                                    | -                                           |
-| `registry`       | ❌ No        | Registry host (e.g. `docker.io`, `ghcr.io`)                                                         | `docker.io`                                 |
 | `repository`     | ✅ Yes       | Image repository (e.g. `user/image` or `ghcr.io/org/image` with non-default registry)              | -                                           |
 | `tag`            | ✅ Yes       | Image tag (e.g. `v1.0.0`, `sha`)                                                                    | -                                           |
+| `registry`       | ❌ No        | Registry host (e.g. `docker.io`, `ghcr.io`)                                                         | `docker.io`                                 |
 | `push_latest`    | ❌ No        | Also tag and push `:latest` (`true`/`false`)                                                        | `false`                                     |
 | `platforms`      | ❌ No        | Target platforms (comma-separated)                                                                  | `linux/amd64,linux/arm64`                   |
 | `build_args`     | ❌ No        | Build args as JSON object (values kept intact; requires valid JSON)                                 | `{}`                                        |
@@ -70,3 +70,8 @@ jobs:
 
 ## 📋 Examples
 [View example →](./examples/base.yml)
+[Artifact →](./examples/artifact.yml)
+[Set repository →](./examples/ghcr.yml)
+[With latest →](./examples/latest.yml)
+[Matrix →](./examples/matrix.yml)
+

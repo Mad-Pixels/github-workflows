@@ -1,5 +1,5 @@
 ---
-name: Node.js CI
+name: Invoke Taskfile commands
 
 on:
   push:
@@ -8,15 +8,22 @@ on:
     branches: [main]
 
 jobs:
-  test-matrix:
-    name: Test Node ${{ matrix.node-version }}
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: ['18', '20', '22']
     steps:
-      - name: Test with Node ${{ matrix.node-version }}
+      - id: task
         uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1
         with:
-          command: "test"
-          vars: "NODE_VERSION:${{ matrix.node-version }}"
+          command: build
+          dir: ./app
+          # Comma-separated key=value pairs
+          # Values may include '=' and newlines, but **not commas**
+          vars: |
+            NODE_ENV=production,VERSION=1.2.3,NOTES=Line1\nLine2
+
+      - name: Use outputs
+        run: |
+          echo "Task version:  ${{ steps.task.outputs.task_version }}"
+          echo "Task output:"
+          printf "%s\n" "${{ steps.task.outputs.task_output }}"
+

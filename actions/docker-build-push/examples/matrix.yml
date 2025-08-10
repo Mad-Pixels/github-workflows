@@ -1,0 +1,38 @@
+---
+name: Monorepo Matrix Build
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            repo: myuser/my-api
+            context: services/api
+            dockerfile: Dockerfile
+          - name: web
+            repo: myuser/my-web
+            context: services/web
+            dockerfile: Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build & Push (${{ matrix.name }})
+        uses: Mad-Pixels/github-workflows/actions/docker-build-push@v1
+        with:
+          docker_user: ${{ secrets.DOCKERHUB_USERNAME }}
+          docker_token: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ matrix.repo }}
+          tag: ${{ github.sha }}
+          platforms: linux/amd64,linux/arm64
+          build_args: '{"VERSION":"${{ github.sha }}","SERVICE":"${{ matrix.name }}"}'
+          context_path: ${{ matrix.context }}
+          dockerfile_path: ${{ matrix.dockerfile }}
+

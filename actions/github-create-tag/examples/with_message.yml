@@ -1,0 +1,32 @@
+name: Create annotated tag (multi-line message)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create'
+        required: true
+        type: string
+
+concurrency:
+  group: manual-tag-${{ inputs.tag }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create annotated tag with release notes
+        uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
+        with:
+          tag: ${{ inputs.tag }}
+          message: |
+            Highlights:
+            - Faster startup
+            - Memory p95: -30%
+            - Bugfix: #123, #124
+          token: ${{ secrets.PAT_TOKEN }}
+

@@ -1,65 +1,210 @@
 ---
 name: 'Branch Validator'
-description: 'Verify that tag or commit is reachable from specified branch (default: main)'
+description: 'Verify that a commit (HEAD / tag / explicit SHA) is reachable from a target branch'
 
 inputs:
-  target_branch:
-    description: 'Branch to validate against (e.g., main or release/v1)'
-    required: false
-    default: 'main'
-  tag_name:
-    description: 'Tag name to validate (if empty, uses current HEAD)'
-    required: false
-    default: ''
+ target_branch:
+   description: 'Branch to validate'
+   required: false
+   default: 'main'
+ tag_name:
+   description: 'Tag name to validate'
+   required: false
+   default: ''
+ commit_sha:
+   description: 'Explicit commit SHA to validate'
+   required: false
+   default: ''
+ fail_on_invalid:
+   description: 'Fail action when commit is not reachable'
+   required: false
+   default: 'true'
 
 outputs:
-  is_valid:
-    description: 'true if commit is from target branch, false otherwise'
-    value: ${{ steps.validate.outputs.is_valid }}
+ is_valid:
+   description: 'true if the commit is reachable from target branch, false otherwise'
+   value: ${{ steps.validate.outputs.is_valid }}
+ commit:
+   description: 'The validated commit SHA'
+   value: ${{ steps.validate.outputs.commit }}
+ subject:
+   description: 'Description of what was validated (HEAD/tag/commit)'
+   value: ${{ steps.validate.outputs.subject }}
+ target_branch:
+   description: 'The target branch used for validation'
+   value: ${{ steps.validate.outputs.target_branch }}
+ merge_base:
+   description: 'Common ancestor commit (only set when validation fails)'
+   value: ${{ steps.validate.outputs.merge_base }}
 
 runs:
-  using: composite
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+ using: composite
+ steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
 
-    - name: Validate branch ancestry
-      id: validate
-      shell: bash
-      run: |
-        set -euo pipefail
+  - name: Export inputs as env
+    shell: bash
+    run: |
+      set -euo pipefail
+      echo "TARGET_BRANCH=${{ inputs.target_branch }}"   >> "$GITHUB_ENV"
+      echo "TAG_NAME=${{ inputs.tag_name }}"             >> "$GITHUB_ENV"
+      echo "COMMIT_SHA_INPUT=${{ inputs.commit_sha }}"   >> "$GITHUB_ENV"
+      echo "FAIL_ON_INVALID=${{ inputs.fail_on_invalid }}" >> "$GITHUB_ENV"
 
-        TARGET_BRANCH="${{ inputs.target_branch }}"
-        TAG_NAME="${{ inputs.tag_name }}"
+  - name: Validate inputs
+    shell: bash
+    run: |
+      set -euo pipefail
+      
+      if [ -n "${TAG_NAME//[$'\t\r\n ']/}" ] && [ -n "${COMMIT_SHA_INPUT//[$'\t\r\n ']/}" ]; then
+        echo "❌ Cannot specify both tag_name and commit_sha"
+        exit 1
+      fi
+       
+      if [ -n "${COMMIT_SHA_INPUT//[$'\t\r\n ']/}" ]; then
+        if [[ ! "${COMMIT_SHA_INPUT}" =~ ^[a-f0-9]{7,40}$ ]]; then
+          echo "❌ Invalid commit SHA format: ${COMMIT_SHA_INPUT}"
+          echo "Expected: 7-40 hexadecimal characters"
+          exit 1
+        fi
+      fi
+       
+      if [[ ! "${TARGET_BRANCH}" =~ ^[a-zA-Z0-9._/-]+$ ]]; then
+        echo "❌ Invalid branch name: ${TARGET_BRANCH}"
+        exit 1
+      fi
+       
+      echo "✅ Inputs validated"
 
-        echo "🔍 Validating commit against branch: $TARGET_BRANCH"
+  - name: Fetch target branch and tags
+    shell: bash
+    run: |
+      set -euo pipefail
 
-        if [ -n "$TAG_NAME" ]; then
-          if ! git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "❌ Tag '$TAG_NAME' does not exist"
-            echo "is_valid=false" >> $GITHUB_OUTPUT
-            exit 1
+      echo "📥 Fetching target branch and (optional) tags…"
+
+      if ! git ls-remote --heads origin "refs/heads/${TARGET_BRANCH}" | grep -q .; then
+        echo "❌ Branch '${TARGET_BRANCH}' does not exist on remote"
+        echo "BRANCH_EXISTS=false" >> "$GITHUB_ENV"
+        exit 0
+      fi
+      echo "BRANCH_EXISTS=true" >> "$GITHUB_ENV"
+
+      git fetch --no-tags --force origin "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" || {
+        echo "❌ Failed to fetch branch '${TARGET_BRANCH}'"
+        echo "FETCH_SUCCESS=false" >> "$GITHUB_ENV"
+        exit 0
+      }
+      if [ -n "${TAG_NAME//[$'\t\r\n ']/}" ]; then
+        git fetch --force --tags origin || echo "⚠️ Failed to fetch tags, continuing..."
+      fi
+
+      echo "FETCH_SUCCESS=true" >> "$GITHUB_ENV"
+      echo "✅ Fetch complete"
+
+  - name: Validate branch ancestry
+    id: validate
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      echo "🔍 Validating reachability to branch: ${TARGET_BRANCH}"
+
+      if [ "${BRANCH_EXISTS:-false}" = "false" ]; then
+        echo "❌ Remote branch 'origin/${TARGET_BRANCH}' not found"
+        echo "is_valid=false" >> "$GITHUB_OUTPUT"
+        echo "target_branch=${TARGET_BRANCH}" >> "$GITHUB_OUTPUT"
+        if [ "${FAIL_ON_INVALID}" = "true" ]; then exit 1; else exit 0; fi
+      fi
+
+      if [ "${FETCH_SUCCESS:-false}" = "false" ]; then
+        echo "❌ Failed to fetch required git data"
+        echo "is_valid=false" >> "$GITHUB_OUTPUT"
+        echo "target_branch=${TARGET_BRANCH}" >> "$GITHUB_OUTPUT"
+        if [ "${FAIL_ON_INVALID}" = "true" ]; then exit 1; else exit 0; fi
+      fi
+
+      SUBJECT="HEAD"
+      if [ -n "${COMMIT_SHA_INPUT//[$'\t\r\n ']/}" ]; then
+        if ! git rev-parse --verify -q "${COMMIT_SHA_INPUT}^{commit}" >/dev/null; then
+          echo "❌ Commit SHA '${COMMIT_SHA_INPUT}' does not exist"
+          echo "is_valid=false" >> "$GITHUB_OUTPUT"
+          echo "target_branch=${TARGET_BRANCH}" >> "$GITHUB_OUTPUT"
+          if [ "${FAIL_ON_INVALID}" = "true" ]; then exit 1; else exit 0; fi
+        fi
+        COMMIT="${COMMIT_SHA_INPUT}"
+        SUBJECT="commit:${COMMIT}"
+      elif [ -n "${TAG_NAME//[$'\t\r\n ']/}" ]; then
+        if ! git rev-parse --verify -q "${TAG_NAME}^{commit}" >/dev/null; then
+          echo "❌ Tag '${TAG_NAME}' does not exist or does not point to a commit"
+          echo "is_valid=false" >> "$GITHUB_OUTPUT"
+          echo "target_branch=${TARGET_BRANCH}" >> "$GITHUB_OUTPUT"
+          if [ "${FAIL_ON_INVALID}" = "true" ]; then exit 1; else exit 0; fi
+        fi
+        COMMIT="$(git rev-list -n 1 "${TAG_NAME}")"
+        SUBJECT="tag:${TAG_NAME}"
+      else
+        COMMIT="$(git rev-parse HEAD)"
+        SUBJECT="HEAD:${COMMIT}"
+      fi
+
+      echo "📦 Subject: ${SUBJECT}"
+      echo "🔗 Commit:  ${COMMIT}"
+
+      if git merge-base --is-ancestor "${COMMIT}" "refs/remotes/origin/${TARGET_BRANCH}"; then
+        echo "✅ Commit is reachable from '${TARGET_BRANCH}'"
+        echo "is_valid=true"  >> "$GITHUB_OUTPUT"
+      else
+        MERGE_BASE=$(git merge-base "${COMMIT}" "refs/remotes/origin/${TARGET_BRANCH}" 2>/dev/null || echo "")
+        if [ -z "$MERGE_BASE" ]; then
+          echo "❌ No common history between commit and '${TARGET_BRANCH}'"
+        else
+          echo "❌ Commit is NOT reachable from '${TARGET_BRANCH}'"
+          echo "   Common ancestor: ${MERGE_BASE}"
+          echo "merge_base=${MERGE_BASE}" >> "$GITHUB_OUTPUT"
+        fi
+        echo "is_valid=false" >> "$GITHUB_OUTPUT"
+        if [ "${FAIL_ON_INVALID}" = "true" ]; then exit 1; fi
+      fi
+
+      echo "commit=${COMMIT}" >> "$GITHUB_OUTPUT"
+      echo "subject=${SUBJECT}" >> "$GITHUB_OUTPUT"
+      echo "target_branch=${TARGET_BRANCH}" >> "$GITHUB_OUTPUT"
+
+  - name: Summary
+    if: always()
+    shell: bash
+    run: |
+      set -euo pipefail
+      
+      RESULT_ICON="❌"
+      if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
+        RESULT_ICON="✅"
+      fi
+      
+      {
+        echo "## 🔎 Branch Validator ${RESULT_ICON}"
+        echo "- **Target branch:** \`${{ inputs.target_branch }}\`"
+        echo "- **Subject:** \`${{ steps.validate.outputs.subject || 'N/A' }}\`"
+        echo "- **Commit:** \`${{ steps.validate.outputs.commit || 'N/A' }}\`"
+        echo "- **Reachable:** \`${{ steps.validate.outputs.is_valid || 'false' }}\`"
+        
+        if [ -n "${{ steps.validate.outputs.merge_base || '' }}" ]; then
+          echo "- **Common ancestor:** \`${{ steps.validate.outputs.merge_base }}\`"
+        fi
+        
+        echo ""
+        if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
+          echo "✅ **Validation passed** - commit is reachable from target branch"
+        else
+          echo "❌ **Validation failed** - commit is not reachable from target branch"
+          if [ "${{ inputs.fail_on_invalid }}" = "false" ]; then
+            echo ""
+            echo "ℹ️ Action continued due to \`fail_on_invalid: false\`"
           fi
-          COMMIT=$(git rev-list -n 1 "$TAG_NAME")
-          echo "📦 Using tag '$TAG_NAME' → commit $COMMIT"
-        else
-          COMMIT=$(git rev-parse HEAD)
-          echo "📦 Using HEAD → commit $COMMIT"
         fi
+      } >> "$GITHUB_STEP_SUMMARY"
 
-        if ! git show-ref --verify --quiet "refs/remotes/origin/$TARGET_BRANCH"; then
-          echo "❌ Remote branch 'origin/$TARGET_BRANCH' not found"
-          echo "is_valid=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi
-
-        if git merge-base --is-ancestor "$COMMIT" "origin/$TARGET_BRANCH"; then
-          echo "✅ Commit $COMMIT is reachable from branch '$TARGET_BRANCH'"
-          echo "is_valid=true" >> $GITHUB_OUTPUT
-        else
-          echo "❌ Commit $COMMIT is NOT reachable from branch '$TARGET_BRANCH'"
-          echo "is_valid=false" >> $GITHUB_OUTPUT
-          exit 1
-        fi

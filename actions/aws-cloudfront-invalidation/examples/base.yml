@@ -18,3 +18,4 @@ jobs:
           role_to_assume: arn:aws:iam::123456789012:role/GHA-OIDC
           distribution_id: E1234567890ABC
           paths: "/* /index.html /assets/*"
+

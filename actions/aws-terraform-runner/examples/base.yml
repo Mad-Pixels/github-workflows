@@ -6,12 +6,16 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: tf-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
+      id-token: write   # OIDC
       contents: read
     steps:
       - name: Run Terraform Plan
@@ -22,7 +26,7 @@ jobs:
           tf_dir: infra/
           tf_workspace: production
           tf_command: plan
-          tf_vars: "-var image_tag=${{ github.sha }}"
+          tf_vars: -var="image_tag=${{ github.sha }}"
           tf_version: 1.8.5
           backend_bucket: my-terraform-state
           backend_key: production/terraform.tfstate
@@ -38,13 +42,14 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Download plan artifact
+      - name: Download plan artifact (optional)
         uses: actions/download-artifact@v4
         with:
           name: terraform-plan
           path: infra/
 
       - name: Run Terraform Apply
+        id: tf-apply
         uses: Mad-Pixels/github-workflows/actions/terraform-runner@v1
         with:
           aws_region: us-east-1
@@ -56,3 +61,4 @@ jobs:
           backend_bucket: my-terraform-state
           backend_key: production/terraform.tfstate
           backend_region: us-east-1
+

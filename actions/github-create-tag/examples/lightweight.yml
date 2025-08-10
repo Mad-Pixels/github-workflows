@@ -1,4 +1,4 @@
-name: Create tag
+name: Create tag (lightweight)
 
 on:
   workflow_dispatch:
@@ -7,11 +7,6 @@ on:
         description: 'Tag to create (e.g., v1.0.0)'
         required: true
         type: string
-      force:
-        description: 'Force overwrite existing tag'
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: manual-tag-${{ inputs.tag }}
@@ -22,12 +17,12 @@ permissions:
 
 jobs:
   create-tag:
-    name: Create Tag
     runs-on: ubuntu-latest
     steps:
-      - name: Invoke
+      - name: Create lightweight tag
         uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
         with:
           tag: ${{ inputs.tag }}
-          force: ${{ inputs.force }}
+          lightweight: 'true'
           token: ${{ secrets.PAT_TOKEN }}
+

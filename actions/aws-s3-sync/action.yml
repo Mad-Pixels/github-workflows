@@ -1,32 +1,34 @@
 ---
-name: Sync Directory to S3
-description: Uploads a local directory to S3 with optional prefix, deletion, and headers
+name: 'Sync Directory to S3'
+description: 'Upload a local directory to S3'
 
 inputs:
   aws_access_key:
-    description: 'AWS access key ID (optional if using OIDC)'
+    description: 'AWS access key ID'
     required: false
   aws_secret_key:
-    description: 'AWS secret access key (optional if using OIDC)'
+    description: 'AWS secret access key'
     required: false
   role_to_assume:
-    description: 'AWS IAM role ARN to assume (for OIDC authentication)'
+    description: 'AWS IAM role ARN to assume'
     required: false
   aws_region:
     description: 'AWS region'
     required: true
-  bucket_name:
-    description: 'Target S3 bucket name'
-    required: true
+
   source_dir:
     description: 'Local path to sync'
+    required: true
+  bucket_name:
+    description: 'Target S3 bucket name'
     required: true
   bucket_prefix:
     description: 'Optional subpath prefix inside the bucket'
     required: false
-    default: ""
+    default: ''
+
   delete_removed:
-    description: 'Remove S3 files not in source_dir'
+    description: 'Remove S3 files not in source_dir (true/false)'
     required: false
     default: 'true'
   exclude_patterns:
@@ -34,8 +36,12 @@ inputs:
     required: false
     default: ".git/* .github/* .gitignore .gitattributes"
   cache_control:
-    description: 'Value for Cache-Control header'
+    description: 'Value for Cache-Control header (applied to uploaded/updated files)'
     required: false
+  content_type_detection:
+    description: 'Enable automatic content-type detection based on file extensions'
+    required: false
+    default: 'true'
 
 outputs:
   files_uploaded:
@@ -45,46 +51,45 @@ outputs:
     description: 'Number of deleted files'
     value: ${{ steps.sync.outputs.files_deleted }}
   total_size:
-    description: 'Total size in bytes'
-    value: ${{ steps.sync.outputs.total_size }}
+    description: 'Total size of local source (bytes)'
+    value: ${{ steps.analyze.outputs.total_size }}
+  file_count:
+    description: 'Total number of files in source directory'
+    value: ${{ steps.analyze.outputs.file_count }}
+  sync_duration:
+    description: 'Sync duration in seconds'
+    value: ${{ steps.sync.outputs.sync_duration }}
   s3_url:
     description: 'Final S3 sync URL'
-    value: ${{ steps.sync.outputs.s3_url }}
+    value: ${{ steps.url.outputs.s3_url }}
 
 runs:
   using: composite
   steps:
-    - name: Set env and S3 URL
-      shell: bash
-      run: |
-        set -eo pipefail
-
-        BUCKET="${{ inputs.bucket_name }}"
-        PREFIX="${{ inputs.bucket_prefix }}"
-        REGION="${{ inputs.aws_region }}"
-        SOURCE="${{ inputs.source_dir }}"
-
-        PREFIX="${PREFIX#/}"
-        PREFIX="${PREFIX%/}"
-
-        if [[ -n "$PREFIX" ]]; then
-          S3_URL="s3://$BUCKET/$PREFIX"
-        else
-          S3_URL="s3://$BUCKET"
-        fi
-
-        echo "BUCKET_NAME=$BUCKET" >> $GITHUB_ENV
-        echo "SOURCE_DIR=$SOURCE" >> $GITHUB_ENV
-        echo "AWS_REGION=$REGION" >> $GITHUB_ENV
-        echo "S3_URL=$S3_URL" >> $GITHUB_ENV
-
     - name: Validate inputs
       shell: bash
       run: |
-        set -eo pipefail
+        set -euo pipefail
 
-        if [[ ! "${{ inputs.bucket_name }}" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
-          echo "❌ Invalid S3 bucket name: ${{ inputs.bucket_name }}"
+        BUCKET="${{ inputs.bucket_name }}"
+        if [[ ${#BUCKET} -lt 3 || ${#BUCKET} -gt 63 ]]; then
+          echo "❌ S3 bucket name must be 3-63 characters: $BUCKET"
+          exit 1
+        fi
+
+        if [[ ! "$BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; then
+          echo "❌ Invalid S3 bucket name: $BUCKET"
+          echo "Must be lowercase letters/digits/dots/hyphens, not start/end with dot/hyphen"
+          exit 1
+        fi
+
+        if [[ "$BUCKET" == *".."* ]]; then
+          echo "❌ S3 bucket name cannot contain consecutive dots: $BUCKET"
+          exit 1
+        fi
+
+        if [[ ! "${{ inputs.aws_region }}" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+          echo "❌ Invalid AWS region: ${{ inputs.aws_region }}"
           exit 1
         fi
 
@@ -100,76 +105,163 @@ runs:
 
         echo "✅ Inputs validated"
 
+    - name: Validate exclude patterns
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        EXCLUDES="${{ inputs.exclude_patterns }}"
+        if [[ -n "$EXCLUDES" ]]; then
+          echo "🔍 Validating exclude patterns..."
+          read -r -a patterns <<< "$EXCLUDES"
+
+          for pattern in "${patterns[@]}"; do
+            [[ -z "$pattern" ]] && continue
+            if [[ "$pattern" == "/*" || "$pattern" == "*" ]]; then
+              echo "⚠️ Exclude pattern '$pattern' will exclude everything"
+            fi
+            echo "  - Exclude: '$pattern'"
+          done
+        fi
+
+        echo "✅ Exclude patterns validated"
+
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_access_key: ${{ inputs.aws_access_key }}
         aws_secret_key: ${{ inputs.aws_secret_key }}
         role_to_assume: ${{ inputs.role_to_assume }}
         aws_region: ${{ inputs.aws_region }}
 
+    - name: Build S3 URL
+      id: url
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        BUCKET="${{ inputs.bucket_name }}"
+        PREFIX="${{ inputs.bucket_prefix }}"
+        PREFIX="${PREFIX#/}"; PREFIX="${PREFIX%/}"
+
+        [[ -n "$PREFIX" ]] && S3_URL="s3://$BUCKET/$PREFIX" || S3_URL="s3://$BUCKET"
+        echo "s3_url=$S3_URL" >> "$GITHUB_OUTPUT"
+        echo "S3_URL=$S3_URL"  >> "$GITHUB_ENV"
+
     - name: Check S3 bucket access
       shell: bash
       run: |
-        set -eo pipefail
-        aws s3 ls "s3://${{ inputs.bucket_name }}" --region "${{ inputs.aws_region }}" >/dev/null || {
+        set -euo pipefail
+
+        if ! command -v aws >/dev/null 2>&1; then
+          echo "ℹ️ AWS CLI not found; skipping pre-check (sync will fail if perms are wrong)."
+          exit 0
+        fi
+
+        echo "🔍 Checking S3 bucket access..."
+        if ! aws s3api head-bucket --bucket "${{ inputs.bucket_name }}" --region "${{ inputs.aws_region }}" >/dev/null 2>&1; then
           echo "❌ Cannot access S3 bucket: ${{ inputs.bucket_name }}"
+          echo "   Ensure the bucket exists, region matches, and IAM permissions are sufficient."
           exit 1
-        }
-        echo "✅ Access to S3 confirmed"
+        fi
+
+        echo "✅ S3 bucket accessible"
+
+    - name: Analyze source directory
+      id: analyze
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        SRC="${{ inputs.source_dir }}"
+        echo "📊 Analyzing source directory: $SRC"
+
+        FILE_COUNT=$(find "$SRC" -type f | wc -l | awk '{print $1}')
+        if find "$SRC" -type f -printf '%s\n' >/dev/null 2>&1; then
+          BYTES=$(find "$SRC" -type f -printf '%s\n' | awk '{sum+=$1} END{print sum+0}')
+        else
+          BYTES=$(find "$SRC" -type f -exec stat -f%z {} \; 2>/dev/null | awk '{sum+=$1} END{print sum+0}' || echo "0")
+        fi
+
+        echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
+        echo "total_size=$BYTES" >> "$GITHUB_OUTPUT"
 
     - name: Sync files to S3
       id: sync
       shell: bash
       run: |
-        set -Eeuo pipefail
+        set -euo pipefail
 
-        BUCKET="${{ inputs.bucket_name }}"
-        PREFIX="${{ inputs.bucket_prefix }}"
+        SYNC_START=$(date +%s)
+        SRC="${{ inputs.source_dir }}"
         REGION="${{ inputs.aws_region }}"
-        SOURCE="${{ inputs.source_dir }}"
-        CACHE_CONTROL="${{ inputs.cache_control }}"
         DELETE="${{ inputs.delete_removed }}"
         EXCLUDES="${{ inputs.exclude_patterns }}"
+        CACHE_CONTROL="${{ inputs.cache_control }}"
+        DETECT_CT="${{ inputs.content_type_detection }}"
+        S3_URL="${S3_URL:?missing}"
 
-        PREFIX="${PREFIX#/}"
-        PREFIX="${PREFIX%/}"
-        [[ -n "$PREFIX" ]] && S3_URL="s3://$BUCKET/$PREFIX" || S3_URL="s3://$BUCKET"
+        SYNC_CMD=(aws s3 sync "$SRC" "$S3_URL" --region "$REGION" --no-progress)
+        [[ "$DELETE" == "true" ]] && SYNC_CMD+=("--delete")
+        [[ "$DETECT_CT" == "false" ]] && SYNC_CMD+=("--no-guess-mime-type")
 
-        SYNC_CMD=(aws s3 sync "$SOURCE" "$S3_URL" --region "$REGION")
-
-        if [[ "$DELETE" == "true" ]]; then
-          SYNC_CMD+=("--delete")
+        if [[ -n "$EXCLUDES" ]]; then
+          read -r -a patterns <<< "$EXCLUDES"
+          for pattern in "${patterns[@]}"; do
+            [[ -n "$pattern" ]] && SYNC_CMD+=("--exclude" "$pattern")
+          done
         fi
 
-        IFS=' ' read -r -a patterns <<< "$EXCLUDES"
-        for pattern in "${patterns[@]}"; do
-          SYNC_CMD+=("--exclude" "$pattern")
-        done
-
-        if [[ -n "$CACHE_CONTROL" ]]; then
-          SYNC_CMD+=("--cache-control" "$CACHE_CONTROL")
-        fi
-
+        [[ -n "$CACHE_CONTROL" ]] && SYNC_CMD+=("--cache-control" "$CACHE_CONTROL")
         echo "🔄 Executing: ${SYNC_CMD[*]}"
-        OUTPUT=$("${SYNC_CMD[@]}" 2>&1)
-        echo "$OUTPUT"
 
-        FILES_UPLOADED=$(echo "$OUTPUT" | grep -c "upload:" || true)
-        FILES_DELETED=$(echo "$OUTPUT" | grep -c "delete:" || true)
-        BYTES=$(find "$SOURCE" -type f -exec stat -c %s {} \; | awk '{sum+=$1} END {print sum}')
-        MB=$(awk "BEGIN {printf \"%.2f\", $BYTES/1024/1024}")
-        echo "files_uploaded=$FILES_UPLOADED" >> $GITHUB_OUTPUT
-        echo "files_deleted=$FILES_DELETED" >> $GITHUB_OUTPUT
-        echo "total_size_mb=$MB" >> $GITHUB_OUTPUT
-        echo "s3_url=$S3_URL" >> $GITHUB_OUTPUT
+        set +e
+        OUTPUT="$("${SYNC_CMD[@]}" 2>&1)"
+        EXIT_CODE=$?
+        set -e
+
+        echo "$OUTPUT"
+        [[ $EXIT_CODE -ne 0 ]] && { echo "❌ Sync failed ($EXIT_CODE)"; exit 1; }
+
+        SYNC_END=$(date +%s)
+        SYNC_DURATION=$((SYNC_END - SYNC_START))
+
+        FILES_UPLOADED=$(echo "$OUTPUT" | grep -E -c '^upload:' || true)
+        FILES_DELETED=$(echo "$OUTPUT" | grep -E -c '^delete:' || true)
+
+        echo "files_uploaded=$FILES_UPLOADED" >> "$GITHUB_OUTPUT"
+        echo "files_deleted=$FILES_DELETED" >> "$GITHUB_OUTPUT"
+        echo "sync_duration=$SYNC_DURATION" >> "$GITHUB_OUTPUT"
 
     - name: Summary
+      if: always()
       shell: bash
       run: |
-        echo "## ☁️ Sync Summary" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Bucket: ${{ inputs.bucket_name }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Path: ${{ inputs.source_dir }} → ${{ steps.sync.outputs.s3_url }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Files uploaded: ${{ steps.sync.outputs.files_uploaded }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Files deleted: ${{ steps.sync.outputs.files_deleted }}" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Total size: ${{ steps.sync.outputs.total_size }} bytes" >> "$GITHUB_STEP_SUMMARY"
+        set -euo pipefail
+
+        OUTCOME="${{ steps.sync.outcome }}"
+        STATUS_ICON="❌"; [[ "$OUTCOME" == "success" ]] && STATUS_ICON="✅"
+        BYTES="${{ steps.analyze.outputs.total_size || 0 }}"
+        MB=$(awk "BEGIN {printf \"%.2f\", (${BYTES})/1024/1024}")
+
+        {
+          echo "## ☁️ S3 Sync ${STATUS_ICON}"
+          echo "- **Bucket:** \`${{ inputs.bucket_name }}\`"
+          echo "- **Source:** \`${{ inputs.source_dir }}\`"
+          # echo "- **Target:** \`${{ steps.url.outputs.s3_url }}\`"
+          echo "- **Region:** \`${{ inputs.aws_region }}\`"
+          echo "- **Delete removed:** \`${{ inputs.delete_removed }}\`"
+          echo "- **Cache-Control:** \`${{ inputs.cache_control || 'N/A' }}\`"
+          echo "- **Content-Type detection:** \`${{ inputs.content_type_detection }}\`"
+          echo "- **Excludes:** \`${{ inputs.exclude_patterns }}\`"
+          if [[ "$OUTCOME" == "success" ]]; then
+            echo "- **Files uploaded:** \`${{ steps.sync.outputs.files_uploaded || '0' }}\`"
+            echo "- **Files deleted:** \`${{ steps.sync.outputs.files_deleted || '0' }}\`"
+            echo "- **Total files:** \`${{ steps.analyze.outputs.file_count || '0' }}\`"
+            echo "- **Total size:** \`${BYTES}\` bytes (~${MB} MiB)"
+            echo "- **Sync duration:** \`${{ steps.sync.outputs.sync_duration || 'N/A' }}\` seconds"
+          else
+            echo "- **Status:** Sync failed — check logs above"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+

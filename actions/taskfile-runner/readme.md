@@ -1,13 +1,11 @@
-# 🧬 [Taskfile](https://taskfile.dev/) Runner
-Execute Taskfile commands.
+# 🧬 Taskfile Runner
+Invoke [Taskfile](https://taskfile.dev/) commands.
 
 ## ✅ Features
-- Automatically installs go-task with specified version
-- Validates Taskfile existence before execution
+- Linux runners only (`ubuntu-latest`), amd64 and arm64
+- Auto-installs `Taskfile` for a specified version (cached per version+arch)
 - Supports custom working directory and environment variables
-- Linux runners (ubuntu-latest) with AMD64 and ARM64 support
-- Detailed output capture and error handling
-- Security-focused execution model
+- Captures full stdout/stderr and exposes it via outputs
 
 ## 📖 Related Documentation
 - [📋 Taskfile Documentation](https://taskfile.dev/)
@@ -15,13 +13,12 @@ Execute Taskfile commands.
 
 ## 🚀 Prerequisites
 Your repository must contain:
-- `Taskfile.yml` or `Taskfile.yaml` in the specified directory
-- The Taskfile must contain the tasks you intend to run via this action
+- `Taskfile.yml` or `Taskfile.yaml` in the directory you run the action from
+- The tasks you plan to invoke
 
 ## 🔧 Quick Example
 ```yaml
 name: CI Pipeline
-
 on: [push, pull_request]
 
 jobs:
@@ -38,8 +35,8 @@ jobs:
 | **Name**     | **Required** | **Description**                                                             | **Default** |
 |--------------|--------------|-----------------------------------------------------------------------------|-------------|
 | `command`    | ✅ Yes       | Name of the task to run (e.g. build, test, lint)                            | -           |
-| `vars`       | ❌ No        | Comma-separated key:value pairs (values must not contain ',' or ':')        | -           |
-| `dir`        | ❌ No        | Directory to run the task from                                              | `.`         |
+| `vars`       | ❌ No        | Comma-separated key=value pairs. Values may contain = and newlines; commas are not allowed. Leading/trailing spaces around pairs are trimmed | -           |
+| `dir`        | ❌ No        | Working directory for the Taskfile                                              | `.`         |
 | `version`    | ❌ No        | Version of go-task to install                                               | `3.44.1`    |
 
 ## 📤 Outputs

@@ -1,5 +1,5 @@
 # 🏷️ Tag Creator
-Create and manage Git tags with validation.
+Create tags with validation.
 
 ## ✅ Features
 - Validates tag format using customizable regex
@@ -8,7 +8,7 @@ Create and manage Git tags with validation.
 - Creates tags from any branch
 - Optional custom tag message
 - Outputs tag SHA, existence flag, and URL
-- Verifies remote tag after push
+- Verifies the tag on the remote after push (with retries)
 
 ## 📖 Related Documentation
 - [Git Tag Documentation](https://git-scm.com/book/en/v2/Git-Basics-Tagging)
@@ -17,7 +17,10 @@ Create and manage Git tags with validation.
 Your workflow must:
 - Run on a runner with Git installed (default `ubuntu-latest` meets this)
 - Provide a token with `contents: write` permission to push tags
-- Ensure the branch to tag from exists in the remote repository
+```yaml
+permissions:
+  contents: write
+```
 
 ## 🔧 Quick Example
 ```yaml
@@ -27,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to create (e.g., v1.0.0)'
+        description: 'Tag to create (e.g., v1.2.3)'
         required: true
 
 jobs:
@@ -47,7 +50,7 @@ jobs:
 ## 📥 Inputs
 | **Name**       | **Required** | **Description**                                                           | **Default** |
 |----------------|--------------|---------------------------------------------------------------------------|-------------|
-| `tag`          | ✅ Yes       | Tag to create (e.g., v1.0.0)                                              | -           |
+| `tag`          | ✅ Yes       | Tag to create (e.g., v1.2.3)                                              | -           |
 | `token`        | ✅ Yes       | GitHub token or PAT with `contents: write` permissions                    | -           |
 | `force`        | ❌ No        | Overwrite existing tag if it exists (`true`/`false`)                      | `false`     |
 | `branch`       | ❌ No        | Branch to tag from                                                        | `main`      |
@@ -63,4 +66,9 @@ jobs:
 | `tag_url`    | GitHub URL to view the created tag               |
 
 ## 📋 Examples
-[View example →](./examples/base.yml)
+[lightweight →](./examples/lightweight.yml)
+[create/replace tag →](./examples/overwrite.yml)
+[custom regex →](./examples/custom_format.yml)
+[non-default branch →](./examples/custom_branch.yml)
+[with message →](./examples/with_message.yml)
+

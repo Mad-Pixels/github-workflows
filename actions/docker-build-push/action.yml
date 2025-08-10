@@ -52,15 +52,63 @@ outputs:
   image_digest:
     description: 'Pushed image manifest-list digest (sha256:...)'
     value: ${{ steps.resolve_digest.outputs.digest }}
+  build_duration:
+    description: 'Build duration in seconds'
+    value: ${{ steps.build.outputs.build_duration }}
+  image_size:
+    description: 'Image size in bytes'
+    value: ${{ steps.resolve_digest.outputs.image_size }}
+  image_ref:
+    description: 'Fully qualified image@digest'
+    value: ${{ steps.resolve_digest.outputs.image_ref }}
 
 runs:
   using: composite
   steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ ! "${{ inputs.tag }}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+          echo "❌ Invalid tag: ${{ inputs.tag }}"
+          echo "Allowed: first [A-Za-z0-9_], total ≤128, chars [A-Za-z0-9_.-]"
+          exit 1
+        fi
+
+        IFS=',' read -ra PLATFORM_ARRAY <<< "${{ inputs.platforms }}"
+        for platform in "${PLATFORM_ARRAY[@]}"; do
+          platform="$(echo "$platform" | xargs)"
+          if [[ ! "$platform" =~ ^[a-z]+/[a-z0-9]+(/v[0-9]+)?$ ]]; then
+            echo "❌ Invalid platform: $platform (expected os/arch or os/arch/vN)"
+            exit 1
+          fi
+        done
+
+        if [[ "${{ inputs.repository }}" =~ [A-Z] ]]; then
+          echo "❌ Repository name cannot contain uppercase letters: ${{ inputs.repository }}"
+          exit 1
+        fi
+
+        if [[ "${{ inputs.build_args }}" != "{}" ]]; then
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "❌ 'jq' is required to parse build_args JSON. Use ubuntu-latest or install jq."
+            exit 1
+          fi
+          if ! echo "${{ inputs.build_args }}" | jq . >/dev/null 2>&1; then
+            echo "❌ Invalid JSON in build_args"
+            exit 1
+          fi
+        fi
+
+        echo "✅ Inputs validated"
+
     - name: Decide build context
       id: ctx
       shell: bash
       run: |
         set -euo pipefail
+
         if [[ -n "${{ inputs.artifact_name }}" ]]; then
           echo "using_artifact=true" >> "$GITHUB_OUTPUT"
           echo "context=./artifact/${{ inputs.context_path }}" >> "$GITHUB_OUTPUT"
@@ -99,18 +147,19 @@ runs:
       id: build
       shell: bash
       env:
+        DOCKERFILE_REL: ${{ inputs.dockerfile_path }}
+        BUILD_ARGS_JSON: ${{ inputs.build_args }}
+        CONTEXT: ${{ steps.ctx.outputs.context }}
+        PUSH_LATEST: ${{ inputs.push_latest }}
+        PLATFORMS: ${{ inputs.platforms }}
         REGISTRY: ${{ inputs.registry }}
         REPO: ${{ inputs.repository }}
         TAG: ${{ inputs.tag }}
-        PLATFORMS: ${{ inputs.platforms }}
-        BUILD_ARGS_JSON: ${{ inputs.build_args }}
-        PUSH_LATEST: ${{ inputs.push_latest }}
-        CONTEXT: ${{ steps.ctx.outputs.context }}
-        DOCKERFILE_REL: ${{ inputs.dockerfile_path }}
       run: |
         set -euo pipefail
 
-        # Normalize repository to include registry only when non-default
+        BUILD_START=$(date +%s)
+
         if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"
         else
@@ -120,36 +169,51 @@ runs:
         DOCKERFILE="${CONTEXT}/${DOCKERFILE_REL}"
         echo "📦 Context: ${CONTEXT}"
         echo "📝 Dockerfile: ${DOCKERFILE}"
-        echo "🎯 Targets: ${PLATFORMS}"
+        echo "🎯 Platforms: ${PLATFORMS}"
         echo "🏷️  Image: ${IMAGE}:${TAG}"
 
-        BUILD_ARGS=""
+        if [[ ! -d "${CONTEXT}" ]]; then
+          echo "❌ Build context not found: ${CONTEXT}"
+          exit 1
+        fi
+        if [[ ! -f "${DOCKERFILE}" ]]; then
+          echo "❌ Dockerfile not found: ${DOCKERFILE}"
+          exit 1
+        fi
+
+        declare -a BUILD_ARGS_ARR=()
         if [[ "${BUILD_ARGS_JSON}" != "{}" ]]; then
           echo "🔧 Build args provided:"
-          echo "${BUILD_ARGS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"' | while read -r kv; do
-            echo "  - $kv"
-          done
-          # shell word-split: safe because we quote each arg later
-          while IFS='=' read -r k v; do
-            # Preserve exact value, including spaces/colons
-            BUILD_ARGS+=" --build-arg ${k}=$(printf '%s' "$v")"
-          done < <(echo "${BUILD_ARGS_JSON}" | jq -r 'to_entries[] | "\(.key)=\(.value)"')
+
+          while IFS=$'\t' read -r k v; do
+            echo "  - ${k}=${v}"
+            BUILD_ARGS_ARR+=(--build-arg "${k}=${v}")
+          done < <(echo "${BUILD_ARGS_JSON}" | jq -r 'to_entries[] | "\(.key)\t\(.value|tostring)"')
         fi
 
-        TAGS="-t ${IMAGE}:${TAG}"
+        TAGS=(-t "${IMAGE}:${TAG}")
         if [[ "${PUSH_LATEST}" == "true" ]]; then
-          TAGS="${TAGS} -t ${IMAGE}:latest"
+          TAGS+=(-t "${IMAGE}:latest")
         fi
 
+        echo "🚀 Starting Docker build..."
         docker buildx build \
           --platform "${PLATFORMS}" \
           --file "${DOCKERFILE}" \
-          ${TAGS} \
-          ${BUILD_ARGS} \
+          "${TAGS[@]}" \
+          "${BUILD_ARGS_ARR[@]}" \
           --cache-from type=gha \
           --cache-to type=gha,mode=max \
           --push \
           "${CONTEXT}"
+
+        BUILD_END=$(date +%s)
+        BUILD_DURATION=$((BUILD_END - BUILD_START))
+        echo "⏱️ Build completed in ${BUILD_DURATION} seconds"
+        echo "build_duration=${BUILD_DURATION}" >> "$GITHUB_OUTPUT"
+        echo "✅ Docker build completed successfully"
+
+        unset DOCKER_CONFIG 2>/dev/null || true
 
     - name: Resolve pushed digest
       id: resolve_digest
@@ -160,51 +224,100 @@ runs:
         TAG: ${{ inputs.tag }}
       run: |
         set -euo pipefail
+
         if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"
         else
           IMAGE="${REPO}"
         fi
-        echo "🔎 Resolve digest for ${IMAGE}:${TAG}"
-        DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" 2>/dev/null | awk '/Digest:/ {print $2; exit}')
-        if [[ -z "${DIGEST:-}" ]]; then
-          echo "❌ Unable to resolve digest for ${IMAGE}:${TAG}"
+
+        echo "🔎 Resolving digest for ${IMAGE}:${TAG}"
+
+        MAX_ATTEMPTS=5
+        ATTEMPT=0
+        DIGEST=""
+
+        while [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; do
+          ATTEMPT=$((ATTEMPT + 1))
+          echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+          if DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" 2>/dev/null | awk '/Digest:/ {print $2; exit}'); then
+            if [[ -n "${DIGEST}" ]]; then
+              echo "✅ Digest resolved: ${DIGEST}"
+              break
+            fi
+          fi
+          if [[ $ATTEMPT -lt $MAX_ATTEMPTS ]]; then
+            echo "⏳ Retrying in 3 seconds..."
+            sleep 3
+          fi
+        done
+
+        if [[ -z "${DIGEST}" ]]; then
+          echo "❌ Unable to resolve digest for ${IMAGE}:${TAG} after $MAX_ATTEMPTS attempts"
           exit 1
         fi
+
+        SIZE_INFO=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" --format '{{.Manifest.Size}}' 2>/dev/null || true)
+        : "${SIZE_INFO:=unknown}"
+
         echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-        echo "✅ Digest: ${DIGEST}"
+        echo "image_size=${SIZE_INFO}" >> "$GITHUB_OUTPUT"
+        echo "image_ref=${IMAGE}@${DIGEST}" >> "$GITHUB_OUTPUT"
 
     - name: Summary
+      if: always()
       shell: bash
       env:
+        BUILD_ARGS_JSON: ${{ inputs.build_args }}
+        PUSH_LATEST: ${{ inputs.push_latest }}
+        PLATFORMS: ${{ inputs.platforms }}
         REGISTRY: ${{ inputs.registry }}
         REPO: ${{ inputs.repository }}
         TAG: ${{ inputs.tag }}
-        PLATFORMS: ${{ inputs.platforms }}
-        BUILD_ARGS_JSON: ${{ inputs.build_args }}
-        PUSH_LATEST: ${{ inputs.push_latest }}
       run: |
         set -euo pipefail
+
+        STATUS_ICON="❌"
+        if [[ "${{ steps.build.outcome }}" == "success" ]]; then
+          STATUS_ICON="✅"
+        fi
+
         if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"
         else
           IMAGE="${REPO}"
         fi
 
-        echo "## 🐳 Docker Build & Push" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Image: \`${IMAGE}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Tags:" >> "$GITHUB_STEP_SUMMARY"
-        echo "  - \`${IMAGE}:${TAG}\`" >> "$GITHUB_STEP_SUMMARY"
-        if [[ "${PUSH_LATEST}" == "true" ]]; then
-          echo "  - \`${IMAGE}:latest\`" >> "$GITHUB_STEP_SUMMARY"
-        fi
-        echo "- Platforms: \`${PLATFORMS}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Digest: \`${{ steps.resolve_digest.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Dockerfile: \`${{ steps.ctx.outputs.context }}/${{ inputs.dockerfile_path }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Context: \`${{ steps.ctx.outputs.context }}\`" >> "$GITHUB_STEP_SUMMARY"
-        if [[ "${BUILD_ARGS_JSON}" != "{}" ]]; then
-          echo "- Build args:" >> "$GITHUB_STEP_SUMMARY"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          echo "${BUILD_ARGS_JSON}" | jq . >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-        fi
+        {
+          echo "## 🐳 Docker Build & Push ${STATUS_ICON}"
+          echo "- **Image:** \`${IMAGE}\`"
+          echo "- **Tags:**"
+          echo "  - \`${IMAGE}:${TAG}\`"
+          if [[ "${PUSH_LATEST}" == "true" ]]; then
+            echo "  - \`${IMAGE}:latest\`"
+          fi
+          echo "- **Platforms:** \`${PLATFORMS}\`"
+          echo "- **Dockerfile:** \`${{ steps.ctx.outputs.context }}/${{ inputs.dockerfile_path }}\`"
+          echo "- **Context:** \`${{ steps.ctx.outputs.context }}\`"
+          if [[ -n "${{ steps.resolve_digest.outputs.digest || '' }}" ]]; then
+            echo "- **Digest:** \`${{ steps.resolve_digest.outputs.digest }}\`"
+            echo "- **Build duration:** ${{ steps.build.outputs.build_duration || 'N/A' }} seconds"
+            echo "- **Image size:** ${{ steps.resolve_digest.outputs.image_size || 'N/A' }} bytes"
+            echo "- **Image ref:** \`${{ steps.resolve_digest.outputs.image_ref || '' }}\`"
+          fi
+          if [[ "${BUILD_ARGS_JSON}" != "{}" ]]; then
+            echo ""
+            echo "### Build args"
+            echo '```json'
+            echo "${BUILD_ARGS_JSON}" | jq .
+            echo '```'
+          fi
+          echo ""
+          if [[ "${{ steps.build.outcome }}" == "success" ]]; then
+            echo "✅ **Build successful** — image pushed to registry"
+          else
+            echo "❌ **Build failed** — check logs for details"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+

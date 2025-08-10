@@ -2,21 +2,19 @@
 Verify that a tag or commit is reachable from a specified branch.
 
 ## ✅ Features
-- Validates if a given commit or tag is part of the history of a target branch
-- Defaults to checking `HEAD` against `main` branch
-- Supports custom branch and tag inputs
-- Returns a boolean output for easy conditional use in workflows
+- Checks if a commit/tag/HEAD is in the history of a target branch
+- Supports explicit commit SHA (`commit_sha`) and tag (`tag_name`)
+- Optional soft mode via `fail_on_invalid: 'false'`
 
 ## 📖 Related Documentation
 - [Git merge-base Documentation](https://git-scm.com/docs/git-merge-base)
 
 ## 🚀 Prerequisites
 Your workflow must:
-- Run on a runner with Git installed (`ubuntu-latest` is fine)
-- Ensure the target branch exists in the remote repository
-- Fetch full history (`fetch-depth: 0`) to allow ancestry checks
+- Run on a runner with Git installed (default `ubuntu-latest` meets this)
 
 ## 🔧 Quick Example
+```yaml
 name: Validate Tag Origin
 
 on:
@@ -25,6 +23,7 @@ on:
       tag:
         description: 'Tag to validate'
         required: true
+        type: string
 
 jobs:
   validate-branch:
@@ -35,17 +34,25 @@ jobs:
         with:
           target_branch: main
           tag_name: ${{ github.event.inputs.tag }}
+```
 
 ## 📥 Inputs
-| **Name**        | **Required** | **Description**                                                        | **Default** |
-|-----------------|--------------|------------------------------------------------------------------------|-------------|
-| `target_branch` | ❌ No        | Branch to validate against (e.g., `main`, `release/v1`)                | `main`      |
-| `tag_name`      | ❌ No        | Tag name to validate; if empty, validates current `HEAD`               | ` `         |
+| **Name**          | **Required** | **Description**                                              | **Default** |
+|-------------------|--------------|--------------------------------------------------------------|-------------|
+| `target_branch`   | ❌ No        | Branch to validate against (e.g., `main`, `release/v1`)      | `main`      |
+| `tag_name`        | ❌ No        | Tag name to validate; if empty, validates current `HEAD`     | ` `         |
+| `commit_sha`      | ❌ No        | Explicit commit SHA to validate (overrides `tag_name/HEAD`)  | ` `         |
+| `fail_on_invalid` | ❌ No        | Fail the action if not reachable ('true'/'false')            | ` `         |
 
 ## 📤 Outputs
-| **Name**   | **Description**                                             |
-|------------|-------------------------------------------------------------|
-| `is_valid` | `true` if commit/tag is reachable from target branch, else `false` |
+| **Name**        | **Description**                                                              |
+|-----------------|------------------------------------------------------------------------------|
+| `is_valid`      | `true` if commit/tag is reachable from target branch, else `false`           |
+| `commit`        | The validated commit SHA                                                     |
+| `subject`       | What was validated (`HEAD:<sha>`, `tag:<name>`, or `commit:<sha>`)           |
+| `target_branch` | The branch used for validation                                               |
+| `merge_base`    | Common ancestor SHA (only set when validation fails and histories intersect) |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)
+

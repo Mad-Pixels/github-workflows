@@ -1,20 +1,20 @@
 ---
 name: Task Runner
-description: Run Taskfile commands
+description: Invoke Taskfile commands
 
 inputs:
   command:
-    description: 'Task command to run (e.g. "build" or "lint")'
+    description: 'Task command to run for invoke'
     required: true
   vars:
-    description: 'Optional environment variables in format key:value,key:value'
+    description: 'Envs for command, format: (key=value,key=value)'
     required: false
   dir:
-    description: 'Working directory inside the project'
+    description: 'Working directory'
     required: false
     default: '.'
   version:
-    description: 'Task binary version to use'
+    description: 'Taskfile version'
     required: false
     default: '3.44.1'
 
@@ -58,13 +58,14 @@ runs:
           aarch64|arm64) ARCH="arm64" ;;
           *) echo "❌ Unsupported architecture: $ARCH" && exit 1 ;;
         esac
+
         echo "arch=$ARCH" >> $GITHUB_OUTPUT
 
     - name: Cache Task binary
       id: cache
       uses: actions/cache@v4
       with:
-        path: ~/.cache/task/task-${{ inputs.version }}-${{ steps.arch.outputs.arch }}
+        path: ${{ env.HOME }}/.cache/task/task-${{ inputs.version }}-${{ steps.arch.outputs.arch }}
         key: task-${{ inputs.version }}-${{ steps.arch.outputs.arch }}
 
     - name: Download Task binary
@@ -78,10 +79,10 @@ runs:
         echo "⬇️  Downloading Task v$VERSION for $ARCH..."
 
         mkdir -p ~/.cache/task
-        curl -sL "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz" \
-          | tar -xz -C /tmp
+        curl -sSLo /tmp/task.tgz --fail "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz"
+        tar -xzf /tmp/task.tgz -C /tmp
         
-        TASK_BINARY=$(find /tmp -name "task*" -type f -executable | head -n 1)
+        TASK_BINARY=$(find /tmp -maxdepth 2 -type f -name "task" -perm -111 | head -n 1)
         if [[ -z "$TASK_BINARY" ]]; then
           echo "❌ Task binary not found in archive"
           exit 1
@@ -97,11 +98,29 @@ runs:
         
         VERSION="${{ inputs.version }}"
         ARCH="${{ steps.arch.outputs.arch }}"
-        
-        sudo cp ~/.cache/task/task-$VERSION-$ARCH /usr/local/bin/task
-        sudo chmod +x /usr/local/bin/task
 
-        INSTALLED_VERSION=$(task --version | grep -o 'v[0-9.]*')
+        if ! mkdir -p ~/.local/bin; then
+          echo "❌ Failed to create ~/.local/bin"
+          exit 1
+        fi
+
+        if ! cp ~/.cache/task/task-$VERSION-$ARCH ~/.local/bin/task; then
+          echo "❌ Failed to copy task binary"
+          exit 1
+        fi
+
+        if ! chmod +x ~/.local/bin/task; then
+          echo "❌ Failed to make task executable"
+          exit 1
+        fi
+
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        if ! ~/.local/bin/task --version >/dev/null 2>&1; then
+          echo "❌ Task binary verification failed"
+          exit 1
+        fi
+
+        INSTALLED_VERSION=$(~/.local/bin/task --version | grep -o 'v[0-9.]*')
         echo "✅ Installed task $INSTALLED_VERSION"
         echo "version=$INSTALLED_VERSION" >> $GITHUB_OUTPUT
 
@@ -110,21 +129,30 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
+    
         echo "🌐 Exporting env vars:"
         IFS=',' read -ra VARS <<< "${{ inputs.vars }}"
         for var in "${VARS[@]}"; do
-          # Trim whitespace
-          var=$(echo "$var" | xargs)
-          [[ -z "$var" ]] && continue
-          
-          IFS=: read -r key value <<< "$var"
-          if [[ -z "$key" || -z "$value" ]]; then
-            echo "❌ Invalid var format: $var"
+          pair="$(echo "$var" | xargs)"
+          [[ -z "$pair" ]] && continue
+
+          key="${pair%%=*}"
+          value="${pair#*=}"
+          if [[ "$value" == "$key" ]]; then
+            echo "❌ Invalid var format: $pair (missing '=' separator)"
             exit 1
           fi
-          echo "  - $key=$value"
-          echo "$key=$value" >> $GITHUB_ENV
+          if [[ -z "$key" ]]; then
+            echo "❌ Invalid var (empty key): $pair"
+            exit 1
+          fi
+
+          delim="ENV_${key}_$RANDOM$RANDOM"
+          {
+            echo "$key<<$delim"
+            printf "%s\n" "$value"
+            echo "$delim"
+          } >> "$GITHUB_ENV"
         done
 
     - name: Run Taskfile command
@@ -135,16 +163,20 @@ runs:
         set -euo pipefail
         
         echo "🚀 Running task ${{ inputs.command }}"
+
         set +e
         OUTPUT=$(task ${{ inputs.command }} 2>&1)
         EXIT_CODE=$?
         set -e
+
+        printf "%s\n" "$OUTPUT"
         
-        echo "$OUTPUT"
-        echo "output<<EOF" >> $GITHUB_OUTPUT
-        echo "$OUTPUT" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        
+        DELIM="__TASK_OUTPUT_$(date +%s%N)__"
+        {
+          echo "output<<$DELIM"
+          printf "%s\n" "$OUTPUT"
+          echo "$DELIM"
+        } >> "$GITHUB_OUTPUT"
         if [[ $EXIT_CODE -ne 0 ]]; then
           echo "❌ Task failed with exit code $EXIT_CODE"
           exit $EXIT_CODE
@@ -157,10 +189,10 @@ runs:
       run: |
         set -euo pipefail
         
-        echo "## 🧰 Task Runner Summary" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Command: \`${{ inputs.command }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Directory: \`${{ inputs.dir }}\`" >> "$GITHUB_STEP_SUMMARY"
-        echo "- Task version: \`${{ steps.install.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
-        if [[ "${{ inputs.vars }}" != "" ]]; then
-          echo "- Environment variables: \`${{ inputs.vars }}\`" >> "$GITHUB_STEP_SUMMARY"
-        fi
+        {
+          echo "## 🧰 Task Runner Summary"
+          echo "- Command: \`${{ inputs.command }}\`"
+          echo "- Directory: \`${{ inputs.dir }}\`"
+          echo "- Task version: \`${{ steps.install.outputs.version }}\`"
+        } >> "$GITHUB_STEP_SUMMARY"
+

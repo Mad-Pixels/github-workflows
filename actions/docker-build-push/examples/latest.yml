@@ -1,29 +1,24 @@
 ---
-name: Build & Push Docker Image
+name: Build & Push with latest
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - name: Build & Push Multi-Platform Image
+      - name: Build & Push (main + latest)
         uses: Mad-Pixels/github-workflows/actions/docker-build-push@v1
         with:
           docker_user: ${{ secrets.DOCKERHUB_USERNAME }}
           docker_token: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: myuser/myimage
-          tag: ${{ github.sha }}
+          tag: v1.2.3
           push_latest: 'true'
           platforms: linux/amd64,linux/arm64
-          build_args: '{"VERSION":"${{ github.sha }}","NODE_ENV":"production"}'
+          build_args: '{"VERSION":"v1.2.3"}'
           context_path: .
           dockerfile_path: Dockerfile
 

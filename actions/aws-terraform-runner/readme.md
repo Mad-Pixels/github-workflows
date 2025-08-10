@@ -1,12 +1,10 @@
 # 🌍 Terraform Runner  
-Run Terraform commands in GitHub Actions with built-in AWS authentication, backend configuration, and workspace management.
+Run AWS Terraform commands with S3 Backend.
 
 ## ✅ Features
 - Supports `plan`, `apply`, and `destroy` commands
 - AWS authentication via static credentials or OIDC role assumption
-- Automatic backend configuration for S3 remote state
 - Optional workspace selection and creation
-- Built-in validation before running commands
 - Execution summary in GitHub Actions summary
 - Optionally stores Terraform plan output as an artifact
 
@@ -52,23 +50,25 @@ jobs:
 ## 📥 Inputs
 | **Name**                | **Required** | **Description**                                                                 | **Default**  |
 |-------------------------|--------------|---------------------------------------------------------------------------------|--------------|
+| `backend_bucket`        | ✅ Yes       | S3 bucket for storing Terraform state                                           | -            |
+| `backend_region`        | ✅ Yes       | AWS region for S3 backend                                                        | -            |
+| `backend_key`           | ✅ Yes       | S3 key (path) for Terraform state                                               | -            |
+| `aws_region`            | ✅ Yes       | AWS region                                                                      | -            |
+| `tf_command`            | ✅ Yes       | Terraform command: `plan`, `apply`, or `destroy`                                | -            |
+| `tf_dir`                | ✅ Yes       | Path to Terraform configuration directory                                       | -            |
 | `aws_access_key_id`     | ❌ No        | AWS access key ID (optional if using OIDC)                                      | -            |
 | `aws_secret_access_key` | ❌ No        | AWS secret access key (optional if using OIDC)                                  | -            |
-| `aws_region`            | ✅ Yes       | AWS region                                                                      | -            |
 | `role_to_assume`        | ❌ No        | AWS IAM role ARN for OIDC authentication                                        | -            |
-| `tf_dir`                | ✅ Yes       | Path to Terraform configuration directory                                       | -            |
 | `tf_workspace`          | ❌ No        | Terraform workspace name                                                        | `""`         |
-| `tf_command`            | ✅ Yes       | Terraform command: `plan`, `apply`, or `destroy`                                | -            |
 | `tf_vars`               | ❌ No        | Extra CLI `-var` flags                                                           | `""`         |
 | `tf_version`            | ❌ No        | Terraform version                                                               | `1.8.5`      |
-| `backend_bucket`        | ✅ Yes       | S3 bucket for storing Terraform state                                           | -            |
-| `backend_key`           | ✅ Yes       | S3 key (path) for Terraform state                                               | -            |
-| `backend_region`        | ✅ Yes       | AWS region for S3 backend                                                        | -            |
 
 ## 📤 Outputs
-| **Name**         | **Description**                                  |
-|------------------|--------------------------------------------------|
-| `plan_artifact`  | Name of the uploaded Terraform plan artifact     |
+| **Name**            | **Description**                                          |
+|---------------------|----------------------------------------------------------|
+| `terraform_command` | Executed Terraform command (`plan`/`apply`/`destroy`)    |
+| `workspace`         | Workspace used during execution                          |
+| `has_outputs`       |  `true` if `terraform output -json` is available (apply) |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

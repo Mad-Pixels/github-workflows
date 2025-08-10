@@ -1,43 +1,48 @@
 ---
-name: CloudFront Invalidation
-description: Creates CloudFront invalidation to clear cache for updated content
+name: 'CloudFront Invalidation'
+description: 'Create a CloudFront invalidation to clear cache'
 
 inputs:
   aws_access_key:
-    description: AWS access key ID (optional if using OIDC)
+    description: 'AWS access key ID'
     required: false
   aws_secret_key:
-    description: AWS secret access key (optional if using OIDC)
+    description: 'AWS secret access key'
     required: false
   aws_region:
-    description: AWS region
+    description: 'AWS region'
     required: true
   role_to_assume:
-    description: AWS IAM role ARN to assume (for OIDC authentication)
+    description: 'AWS IAM role ARN to assume'
     required: false
 
   distribution_id:
-    description: CloudFront distribution ID
+    description: 'CloudFront distribution ID'
     required: true
   paths:
     description: >
-      Paths to invalidate (space-separated,
-      e.g. "/* /index.html /css/*")
+      Space-separated paths to invalidate (e.g. "/* /index.html /css/*")
     required: false
     default: "/*"
   caller_reference:
     description: >
-      Unique reference for this invalidation
-      (auto-generated if not provided)
+      Unique reference for this invalidation (auto-generated if not provided)
     required: false
+  wait_for_completion:
+    description: 'Wait until invalidation status becomes Completed'
+    required: false
+    default: 'false'
 
 outputs:
   invalidation_id:
-    description: The ID of the created invalidation
+    description: 'ID of the created invalidation'
     value: ${{ steps.invalidate.outputs.invalidation_id }}
   status:
-    description: The status of the invalidation
+    description: 'Status of the invalidation (InProgress/Completed)'
     value: ${{ steps.invalidate.outputs.status }}
+  caller_reference:
+    description: 'CallerReference used for this invalidation'
+    value: ${{ steps.invalidate.outputs.caller_reference }}
 
 runs:
   using: composite
@@ -45,44 +50,49 @@ runs:
     - name: Validate inputs
       shell: bash
       run: |
-        set -e
+        set -euo pipefail
 
-        if ! command -v jq &> /dev/null; then
-          echo "❌ jq is required but not found. Please install jq or use ubuntu-latest runner"
+        if ! command -v aws >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+          echo "❌ AWS CLI and jq are required on the runner (use ubuntu-latest)"
           exit 1
         fi
 
         if [[ ! "${{ inputs.distribution_id }}" =~ ^E[A-Z0-9]{13}$ ]]; then
-          echo "❌ Invalid CloudFront distribution ID format: ${{ inputs.distribution_id }}"
-          echo "Expected format: E + 13 alphanumeric characters (e.g., E1234567890ABC)"
+          echo "❌ Invalid CloudFront distribution ID: ${{ inputs.distribution_id }}"
+          echo "Expected pattern: ^E[A-Z0-9]{13}$ (e.g., E1234567890ABC)"
           exit 1
         fi
 
         PATHS="${{ inputs.paths }}"
-        if [ -z "$PATHS" ]; then
-          echo "❌ Paths cannot be empty"
+        if [[ -z "$PATHS" ]]; then
+          echo "❌ 'paths' cannot be empty"
           exit 1
         fi
 
-        IFS=' ' read -ra PATHS_ARRAY <<< "$PATHS"
+        read -r -a PATHS_ARRAY <<< "$PATHS"
         PATHS_COUNT=${#PATHS_ARRAY[@]}
-        if [ $PATHS_COUNT -gt 1000 ]; then
-          echo "❌ Too many paths ($PATHS_COUNT). CloudFront allows maximum 1000 paths per invalidation"
-          echo "Consider using fewer paths or /* wildcard"
+        if (( PATHS_COUNT == 0 )); then
+          echo "❌ No paths provided"
           exit 1
         fi
 
-        for path in "${PATHS_ARRAY[@]}"; do
-          if [[ ! "$path" =~ ^/.* ]]; then
-            echo "❌ Invalid path: $path (must start with /)"
+        if (( PATHS_COUNT > 1000 )); then
+          echo "❌ Too many paths ($PATHS_COUNT) — CloudFront allows up to 1000 per invalidation"
+          echo "   Consider using fewer paths or a wildcard like /*"
+          exit 1
+        fi
+
+        for p in "${PATHS_ARRAY[@]}"; do
+          if [[ ! "$p" =~ ^/ ]]; then
+            echo "❌ Invalid path: $p (must start with /)"
             exit 1
           fi
         done
 
-        echo "✅ Input validation passed ($PATHS_COUNT paths)"
+        echo "✅ Input validation passed ($PATHS_COUNT path(s))"
 
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@main
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_access_key: ${{ inputs.aws_access_key }}
         aws_secret_key: ${{ inputs.aws_secret_key }}
@@ -93,61 +103,106 @@ runs:
       id: invalidate
       shell: bash
       run: |
-        set -e
+        set -euo pipefail
 
-        if [ -z "${{ inputs.caller_reference }}" ]; then
-          TIMESTAMP=$(date +%s)
-          SHORT_SHA="${{ github.sha }}"
-          SHORT_SHA=${SHORT_SHA:0:8}
-          CALLER_REF="gh-${TIMESTAMP}-${{ github.run_id }}-${SHORT_SHA}"
-        else
+        if [[ -n "${{ inputs.caller_reference }}" ]]; then
           CALLER_REF="${{ inputs.caller_reference }}"
+        else
+          TS=$(date +%s)
+          SHA="${{ github.sha }}"; SHORT_SHA="${SHA:0:8}"
+          CALLER_REF="gh-${TS}-${{ github.run_id }}-${SHORT_SHA}"
         fi
 
-        echo "🚀 Creating CloudFront invalidation..."
-        echo "Distribution ID: ${{ inputs.distribution_id }}"
-        echo "Caller Reference: ${CALLER_REF}"
-        echo "Paths: ${{ inputs.paths }}"
-
-        IFS=' ' read -ra PATHS_ARRAY <<< "${{ inputs.paths }}"
+        read -r -a PATHS_ARRAY <<< "${{ inputs.paths }}"
         PATHS_COUNT=${#PATHS_ARRAY[@]}
-
         PATHS_JSON=$(printf '%s\n' "${PATHS_ARRAY[@]}" | jq -R . | jq -s .)
-        echo "📝 Invalidating $PATHS_COUNT path(s)..."
 
         INVALIDATION_BATCH=$(jq -n \
           --argjson paths "$PATHS_JSON" \
-          --arg caller_ref "$CALLER_REF" \
-          --argjson quantity "$PATHS_COUNT" \
-          '{
-            "Paths": {
-              "Quantity": $quantity,
-              "Items": $paths
-            },
-            "CallerReference": $caller_ref
-          }')
+          --arg caller "$CALLER_REF" \
+          --argjson qty "$PATHS_COUNT" \
+          '{Paths:{Quantity:$qty,Items:$paths},CallerReference:$caller}')
 
-        INVALIDATION_RESPONSE=$(aws cloudfront create-invalidation \
+        echo "🚀 Creating CloudFront invalidation"
+        echo "• Distribution: ${{ inputs.distribution_id }}"
+        echo "• CallerReference: $CALLER_REF"
+        echo "• Paths ($PATHS_COUNT): ${{ inputs.paths }}"
+
+        RESP=$(aws cloudfront create-invalidation \
           --distribution-id "${{ inputs.distribution_id }}" \
           --invalidation-batch "$INVALIDATION_BATCH" \
           --output json \
           --no-cli-pager)
 
-        INVALIDATION_ID=$(echo "$INVALIDATION_RESPONSE" | jq -r '.Invalidation.Id')
-        STATUS=$(echo "$INVALIDATION_RESPONSE" | jq -r '.Invalidation.Status')
+        ID=$(echo "$RESP" | jq -r '.Invalidation.Id')
+        STATUS=$(echo "$RESP" | jq -r '.Invalidation.Status')
 
-        echo "✅ CloudFront invalidation created successfully!"
-        echo "Invalidation ID: $INVALIDATION_ID"
-        echo "Status: $STATUS"
-        echo "invalidation_id=$INVALIDATION_ID" >> $GITHUB_OUTPUT
-        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "invalidation_id=$ID"       >> "$GITHUB_OUTPUT"
+        echo "status=$STATUS"            >> "$GITHUB_OUTPUT"
+        echo "caller_reference=$CALLER_REF" >> "$GITHUB_OUTPUT"
 
-    - name: Summary
+        echo "✅ Invalidation created: $ID (status: $STATUS)"
+
+    - name: Wait for completion
+      if: inputs.wait_for_completion == 'true'
       shell: bash
       run: |
-        echo "## 📊 CloudFront Invalidation Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Invalidation ID:** ${{ steps.invalidate.outputs.invalidation_id }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Status:** ${{ steps.invalidate.outputs.status }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Paths invalidated:** ${{ inputs.paths }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "ℹ️ Invalidation started. It may take 10-15 minutes to complete." >> $GITHUB_STEP_SUMMARY
+        set -euo pipefail
+
+        DIST="${{ inputs.distribution_id }}"
+        ID="${{ steps.invalidate.outputs.invalidation_id }}"
+
+        echo "⏳ Waiting for invalidation $ID to become Completed..."
+
+        ATTEMPTS=0
+        MAX_ATTEMPTS=90
+        while (( ATTEMPTS < MAX_ATTEMPTS )); do
+          STATUS=$(aws cloudfront get-invalidation \
+            --distribution-id "$DIST" \
+            --id "$ID" \
+            --output json \
+            --no-cli-pager | jq -r '.Invalidation.Status')
+
+          echo "  Attempt $((ATTEMPTS+1))/$MAX_ATTEMPTS — status: $STATUS"
+          if [[ "$STATUS" == "Completed" ]]; then
+            echo "✅ Invalidation completed"
+            break
+          fi
+          ATTEMPTS=$((ATTEMPTS+1))
+          sleep 10
+        done
+
+        if (( ATTEMPTS == MAX_ATTEMPTS )); then
+          echo "⚠️  Timed out waiting for completion — current status: $STATUS"
+        fi
+
+    - name: Summary
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        STATUS_ICON="❌"
+        [[ "${{ steps.invalidate.outputs.invalidation_id }}" != "" ]] && STATUS_ICON="✅"
+
+        ID="${{ steps.invalidate.outputs.invalidation_id }}"
+        CF_LINK="https://console.aws.amazon.com/cloudfront/v4/home#/distributions/${DIST}/invalidations/${ID}"
+
+        {
+          echo "## 📊 CloudFront Invalidation ${STATUS_ICON}"
+          echo "- **Invalidation ID:** \`${ID:-N/A}\`"
+          echo "- **Status:** \`${{ steps.invalidate.outputs.status || 'N/A' }}\`"
+          echo "- **Paths:** \`${{ inputs.paths }}\`"
+          echo "- **CallerReference:** \`${{ steps.invalidate.outputs.caller_reference || 'auto' }}\`"
+          if [[ -n "$ID" ]]; then
+            echo "- **Console:** ${CF_LINK}"
+          fi
+
+          echo ""
+          if [[ "${{ inputs.wait_for_completion }}" == "true" ]]; then
+            echo "⏱️ Waited for completion: **true**"
+          else
+            echo "⏱️ Waited for completion: **false** (status may change to *Completed* in ~10–15 minutes)"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
