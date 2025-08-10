@@ -214,21 +214,31 @@ runs:
         set -euo pipefail
         CMD="${{ inputs.tf_command }}"
 
-        WS_IN="${{ inputs.tf_workspace }}"
-        if [[ -n "$WS_IN" ]]; then
-          WS="$WS_IN"
+        if [[ -n "${{ inputs.tf_workspace }}" ]]; then
+          WS="${{ inputs.tf_workspace }}"
         else
-          WS="$(terraform workspace show 2>/dev/null || echo default)"
+          WS="$(terraform workspace show 2>/dev/null | tr -d '\r' | head -n1)"
+          WS="${WS## }"; WS="${WS%% }"
+          [[ -z "$WS" ]] && WS="default"
         fi
 
         TFV="$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version":"\([^"]*\)".*/\1/p')"
         [[ -z "$TFV" ]] && TFV="${{ inputs.tf_version }}"
 
-        {
-          echo "terraform_command=$CMD"
-          echo "workspace=$WS"
-          echo "terraform_version=$TFV"
-        } >> "$GITHUB_OUTPUT"
+        write_output () {
+          local name="$1"; shift
+          local val="$1"
+          local delim="__${name}_$(date +%s%N)__"
+          {
+            echo "${name}<<${delim}"
+            printf "%s\n" "$val"
+            echo "${delim}"
+          } >> "$GITHUB_OUTPUT"
+        }
+
+        write_output terraform_command "$CMD"
+        write_output terraform_version "$TFV"
+        write_output workspace "$WS"
 
     - name: Terraform Summary
       if: inputs.show_summary != 'false'
