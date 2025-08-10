@@ -205,13 +205,15 @@ runs:
       run: |
         set -euo pipefail
 
-        OUT="$(cat <<'EOF'
-          ${{ steps.run.outputs.output }}
-          EOF
-        )"
-
         LIMIT=200
-        TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
+        OUT_STR="${{ steps.run.outputs.output }}"
+        
+        set -f 
+        IFS=$'\n' read -r -d '' -a LINES <<< "${OUT_STR}"$'\0'
+        set +f
+
+        TOTAL="${#LINES[@]}"
+        MAX="$LIMIT"; if (( TOTAL < LIMIT )); then MAX="$TOTAL"; fi
 
         {
           echo "## 🧰 Task Runner Summary"
@@ -219,15 +221,17 @@ runs:
           echo "- Directory: \`${{ inputs.dir }}\`"
           echo "- Task version: \`${{ steps.install.outputs.version }}\`"
 
-          if [ -n "$OUT" ]; then
+          if (( TOTAL > 0 )); then
             echo ""
-            if [ "$TOTAL" -le "$LIMIT" ]; then
-              echo "### 🧾 Task output"
-            else
-              echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
-            fi
+          if (( TOTAL <= LIMIT )); then
+            echo "### 🧾 Task output"
+          else
+            echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
+          fi
             echo '```'
-            printf "%s\n" "$OUT" | sed -n "1,${LIMIT}p"
+            for ((i=0; i<MAX; i++)); do
+              printf '%s\n' "${LINES[i]}"
+            done
             echo '```'
           fi
         } >> "$GITHUB_STEP_SUMMARY"
