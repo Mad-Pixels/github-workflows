@@ -215,18 +215,18 @@ runs:
           echo "- Task version: \`${{ steps.install.outputs.version }}\`"
 
           if [ -n "${OUT}" ]; then
-          echo ""
+            echo ""
           
-          TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
-          if [ "$TOTAL" -le "$LIMIT" ]; then
-            echo "### 🧾 Task output"
-          else
-            echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
-          fi
+            TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
+            if [ "$TOTAL" -le "$LIMIT" ]; then
+              echo "### 🧾 Task output"
+            else
+              echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
+            fi
 
-          echo '```'
-          printf "%s\n" "$OUT" | awk -v lim="$LIMIT" 'NR<=lim{print}'
-          echo '```'
-      fi
-    } >> "$GITHUB_STEP_SUMMARY"
+            echo '```'
+            printf "%s\n" "$OUT" | awk -v lim="$LIMIT" 'NR<=lim{print}'
+            echo '```'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
 
