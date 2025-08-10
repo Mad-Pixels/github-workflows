@@ -204,22 +204,30 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
+
+        OUT="$(cat <<'EOF'
+          ${{ steps.run.outputs.output }}
+          EOF
+        )"
+
+        LIMIT=200
+        TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
+
         {
           echo "## 🧰 Task Runner Summary"
           echo "- Command: \`${{ inputs.command }}\`"
           echo "- Directory: \`${{ inputs.dir }}\`"
           echo "- Task version: \`${{ steps.install.outputs.version }}\`"
 
-          if [ -s "$TMP" ]; then
+          if [ -n "$OUT" ]; then
             echo ""
-          if [ "$LINES" -le "$LIMIT" ]; then
-            echo "### 🧾 Task output"
-          else
-            echo "### 🧾 Task output (first ${LIMIT} lines of ${LINES})"
-          fi
+            if [ "$TOTAL" -le "$LIMIT" ]; then
+              echo "### 🧾 Task output"
+            else
+              echo "### 🧾 Task output (first ${LIMIT} lines of ${TOTAL})"
+            fi
             echo '```'
-            sed -n "1,${LIMIT}p" "$TMP"
+            printf "%s\n" "$OUT" | sed -n "1,${LIMIT}p"
             echo '```'
           fi
         } >> "$GITHUB_STEP_SUMMARY"
