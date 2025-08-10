@@ -45,6 +45,15 @@ inputs:
     description: 'Backend AWS region'
     required: true
 
+  show_summary:
+    description: 'Print summary with output in job summary'
+    required: false
+    default: 'true'
+  summary_limit:
+    description: 'Max number of plan output lines to show in summary'
+    required: false
+    default: '500'
+
 runs:
   using: composite
   steps:
@@ -86,7 +95,7 @@ runs:
         echo "✅ Inputs validated"
 
     - name: Configure AWS authentication
-      uses: Mad-Pixels/github-workflows/internal/aws-auth@concept2
+      uses: Mad-Pixels/github-workflows/internal/aws-auth@v1
       with:
         aws_secret_key: ${{ inputs.aws_secret_access_key }}
         aws_access_key: ${{ inputs.aws_access_key_id }}
@@ -97,7 +106,6 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-
         {
           echo "TF_IN_AUTOMATION=1"
           echo "TF_INPUT=0"
@@ -114,7 +122,6 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-
         cat > backend_aws.hcl <<'HCL'
         bucket  = "${{ inputs.backend_bucket }}"
         key     = "${{ inputs.backend_key }}"
@@ -127,7 +134,6 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-
         cat > backend.tf <<'TF'
         terraform {
           backend "s3" {}
@@ -139,7 +145,6 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       run: |
         set -euo pipefail
-
         terraform init -input=false -reconfigure -backend-config=backend_aws.hcl
 
     - name: Select or create workspace
@@ -148,10 +153,8 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       run: |
         set -euo pipefail
-
         terraform workspace select "${{ inputs.tf_workspace }}" \
           || terraform workspace new "${{ inputs.tf_workspace }}"
-
         echo "Current workspace: $(terraform workspace show)"
 
     - name: Terraform Validate
@@ -159,7 +162,6 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       run: |
         set -euo pipefail
-
         terraform validate
 
     - name: Run Terraform Command
@@ -168,10 +170,8 @@ runs:
       working-directory: ${{ inputs.tf_dir }}
       run: |
         set -euo pipefail
-
         CMD="${{ inputs.tf_command }}"
         EXTRA='${{ inputs.tf_vars }}'
-
         case "$CMD" in
           plan)
             echo "🚀 terraform plan"
@@ -196,6 +196,7 @@ runs:
         if-no-files-found: error
 
     - name: Terraform Summary
+      if: inputs.show_summary != 'false'
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
       run: |
@@ -206,6 +207,9 @@ runs:
 
         TFV="$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version":"\([^"]*\)".*/\1/p')"
         [[ -z "$TFV" ]] && TFV="${{ inputs.tf_version }}"
+
+        LIMIT_RAW="${{ inputs.summary_limit }}"
+        if ! [[ "$LIMIT_RAW" =~ ^[0-9]+$ ]]; then LIMIT=250; else LIMIT="$LIMIT_RAW"; fi
 
         {
           echo "## 🛠️ Terraform Execution Summary"
@@ -218,11 +222,10 @@ runs:
 
           if [[ "${{ inputs.tf_command }}" == "plan" && -f "tfplan" ]]; then
             echo ""
-            echo "### 📄 Plan (first 400 lines)"
-            terraform show -no-color tfplan | sed -n '1,400p'
-
             TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
-            if [[ "$TOTAL_LINES" -gt 400 ]]; then
+            echo "### 📄 Plan (first ${LIMIT} lines${TOTAL_LINES:+ of ${TOTAL_LINES}})"
+            terraform show -no-color tfplan | sed -n "1,${LIMIT}p"
+            if [[ -n "$TOTAL_LINES" && "$TOTAL_LINES" -gt "$LIMIT" ]]; then
               echo ""
               echo "_…truncated, total lines: $TOTAL_LINES_"
             fi
