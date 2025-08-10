@@ -247,7 +247,7 @@ runs:
       run: |
         set -euo pipefail
 
-        WORKSPACE="${{ steps.collect.outputs.workspace }}"
+        WS="${{ inputs.tf_workspace != '' && inputs.tf_workspace || steps.collect.outputs.workspace }}"
         TFV="${{ steps.collect.outputs.terraform_version }}"
 
         LIMIT_RAW="${{ inputs.summary_limit }}"
@@ -257,7 +257,7 @@ runs:
           echo "## 🛠️ Terraform Execution Summary"
           echo "- **Command:** \`${{ inputs.tf_command }}\`"
           echo "- **Directory:** \`${{ inputs.tf_dir }}\`"
-          echo "- **Workspace:** \`$WORKSPACE\`"
+          echo "- **Workspace:** \`$WS\`"
           echo "- **Terraform version:** \`$TFV\`"
           echo "- **Backend:** S3 \`${{ inputs.backend_bucket }}:${{ inputs.backend_key }}\`"
           echo "  in \`${{ inputs.backend_region }}\`"
