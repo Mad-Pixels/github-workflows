@@ -73,22 +73,41 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
+
         VERSION="${{ inputs.version }}"
         ARCH="${{ steps.arch.outputs.arch }}"
         echo "⬇️  Downloading Task v$VERSION for $ARCH..."
 
+        TMPDIR="$(mktemp -d)"
+        trap 'rm -rf "$TMPDIR"' EXIT
+
         mkdir -p ~/.cache/task
-        curl -sSLo /tmp/task.tgz --fail "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz"
-        tar -xzf /tmp/task.tgz -C /tmp
-        
-        TASK_BINARY=$(find /tmp -maxdepth 2 -type f -name "task" -perm -111 | head -n 1)
+        curl -fsSLo "$TMPDIR/task.tgz" "https://github.com/go-task/task/releases/download/v${VERSION}/task_linux_${ARCH}.tar.gz"
+        tar -xzf "$TMPDIR/task.tgz" -C "$TMPDIR"
+
+        TASK_BINARY=""
+        for cand in \
+          "$TMPDIR/task" \
+          "$TMPDIR/bin/task" \
+          "$TMPDIR/task_linux_${ARCH}/task"
+        do
+          if [[ -f "$cand" && -x "$cand" ]]; then
+            TASK_BINARY="$cand"
+            break
+          fi
+        done
+
+        if [[ -z "$TASK_BINARY" ]]; then
+          TASK_BINARY="$(find "$TMPDIR" -maxdepth 3 -type f -name task -perm -111 -print -quit || true)"
+        fi
+
         if [[ -z "$TASK_BINARY" ]]; then
           echo "❌ Task binary not found in archive"
           exit 1
         fi
 
         mv "$TASK_BINARY" ~/.cache/task/task-$VERSION-$ARCH
+        echo "✅ Downloaded to ~/.cache/task/task-$VERSION-$ARCH"
 
     - name: Install Task binary
       id: install
