@@ -178,6 +178,7 @@ runs:
             echo "✅ Invalidation completed"
             break
           fi
+
           ATTEMPTS=$((ATTEMPTS+1))
           sleep 10
         done

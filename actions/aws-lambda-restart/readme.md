@@ -62,8 +62,10 @@ jobs:
 ## 📤 Outputs
 | **Name**         | **Description**                         |
 |------------------|-----------------------------------------|
+| `function_arn`   | Lambda function ARN                     |
 | `last_modified`  | Function last modified timestamp        |
 | `code_sha256`    | Lambda code SHA256                      |
+| `imgae_url`      | Resolved image URI                      |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

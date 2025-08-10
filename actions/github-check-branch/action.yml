@@ -57,9 +57,9 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        echo "TARGET_BRANCH=${{ inputs.target_branch }}"   >> "$GITHUB_ENV"
-        echo "TAG_NAME=${{ inputs.tag_name }}"             >> "$GITHUB_ENV"
-        echo "COMMIT_SHA_INPUT=${{ inputs.commit_sha }}"   >> "$GITHUB_ENV"
+        echo "TARGET_BRANCH=${{ inputs.target_branch }}"     >> "$GITHUB_ENV"
+        echo "TAG_NAME=${{ inputs.tag_name }}"               >> "$GITHUB_ENV"
+        echo "COMMIT_SHA_INPUT=${{ inputs.commit_sha }}"     >> "$GITHUB_ENV"
         echo "FAIL_ON_INVALID=${{ inputs.fail_on_invalid }}" >> "$GITHUB_ENV"
 
     - name: Validate inputs

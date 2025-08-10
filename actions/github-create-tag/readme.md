@@ -57,8 +57,8 @@ jobs:
 | `tag_format`   | ❌ No        | Regex to validate tag format                                              | `^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` |
 | `message`      | ❌ No        | Message for annotated tag (ignored for lightweight tags)                  | -                                 |
 | `lightweight`  | ❌ No        | Create lightweight tag (overrides message) (`true`/`false`)               | `false`                           |
-| `show_summary`    | ❌ No        | Print summary with task output in job summary                          | `true`                            |
-| `summary_limit`   | ❌ No        | Max number of output lines to show in summary                          | `250`                             |
+| `show_summary` | ❌ No        | Print summary with task output in job summary                             | `true`                            |
+| `summary_limit`| ❌ No        | Max number of output lines to show in summary                             | `250`                             |
 
 ## 📤 Outputs
 | **Name**     | **Description**                                  |

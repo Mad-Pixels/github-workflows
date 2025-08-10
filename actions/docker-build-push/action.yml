@@ -168,7 +168,6 @@ runs:
         set -euo pipefail
 
         BUILD_START=$(date +%s)
-
         if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"
         else

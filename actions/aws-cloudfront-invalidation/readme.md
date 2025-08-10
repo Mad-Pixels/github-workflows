@@ -53,10 +53,11 @@ jobs:
 | `summary_limit`    | ❌ No        | Max number of output lines to show in summary                                                           | `250`       |
 
 ## 📤 Outputs
-| **Name**          | **Description**                   |
-|-------------------|-----------------------------------|
-| `invalidation_id` | ID of the created invalidation    |
-| `status`          | Status returned by CloudFront     |
+| **Name**          | **Description**                     |
+|-------------------|-------------------------------------|
+| `invalidation_id` | ID of the created invalidation      |
+| `status`          | Status returned by CloudFront       |
+| `caller_reference`| Reference used for this invalidation|
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

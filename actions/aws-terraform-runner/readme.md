@@ -70,7 +70,7 @@ jobs:
 |---------------------|----------------------------------------------------------|
 | `terraform_command` | Executed Terraform command (`plan`/`apply`/`destroy`)    |
 | `workspace`         | Workspace used during execution                          |
-| `has_outputs`       |  `true` if `terraform output -json` is available (apply) |
+| `terraform_version` | Used terraform version                                   |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

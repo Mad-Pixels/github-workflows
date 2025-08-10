@@ -33,6 +33,9 @@ outputs:
   task_output:
     description: 'Task command output'
     value: ${{ steps.run.outputs.output }}
+  task_command:
+    description: 'Executed task command'
+    value: ${{ inputs.command }}
 
 runs:
   using: composite

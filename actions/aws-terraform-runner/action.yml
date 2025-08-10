@@ -54,6 +54,17 @@ inputs:
     required: false
     default: '500'
 
+outputs:
+  terraform_command:
+    description: 'Executed Terraform command'
+    value: ${{ steps.collect.outputs.terraform_command }}
+  workspace:
+    description: 'Terraform workspace used'
+    value: ${{ steps.collect.outputs.workspace }}
+  terraform_version:
+    description: 'Detected Terraform version'
+    value: ${{ steps.collect.outputs.terraform_version }}
+
 runs:
   using: composite
   steps:
@@ -195,6 +206,30 @@ runs:
         path: ${{ inputs.tf_dir }}/tfplan
         if-no-files-found: error
 
+    - name: Collect outputs
+      id: collect
+      shell: bash
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        set -euo pipefail
+        CMD="${{ inputs.tf_command }}"
+
+        WS_IN="${{ inputs.tf_workspace }}"
+        if [[ -n "$WS_IN" ]]; then
+          WS="$WS_IN"
+        else
+          WS="$(terraform workspace show 2>/dev/null || echo default)"
+        fi
+
+        TFV="$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version":"\([^"]*\)".*/\1/p')"
+        [[ -z "$TFV" ]] && TFV="${{ inputs.tf_version }}"
+
+        {
+          echo "terraform_command=$CMD"
+          echo "workspace=$WS"
+          echo "terraform_version=$TFV"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Terraform Summary
       if: inputs.show_summary != 'false'
       shell: bash
@@ -202,11 +237,8 @@ runs:
       run: |
         set -euo pipefail
 
-        WORKSPACE="${{ inputs.tf_workspace }}"
-        [[ -z "$WORKSPACE" ]] && WORKSPACE="default"
-
-        TFV="$(terraform version -json 2>/dev/null | sed -n 's/.*"terraform_version":"\([^"]*\)".*/\1/p')"
-        [[ -z "$TFV" ]] && TFV="${{ inputs.tf_version }}"
+        WORKSPACE="${{ steps.collect.outputs.workspace }}"
+        TFV="${{ steps.collect.outputs.terraform_version }}"
 
         LIMIT_RAW="${{ inputs.summary_limit }}"
         if ! [[ "$LIMIT_RAW" =~ ^[0-9]+$ ]]; then LIMIT=250; else LIMIT="$LIMIT_RAW"; fi

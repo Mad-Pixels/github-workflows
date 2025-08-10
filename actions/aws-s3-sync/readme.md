@@ -73,6 +73,7 @@ jobs:
 | `total_size`      | Total size in bytes of local files synced       |
 | `file_count`      | Total number of local files considered for sync |
 | `sync_duration`   | Sync duration in seconds                        |
+| `s3_url`          | Final S3 sync url                               |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

@@ -253,7 +253,6 @@ runs:
         BYTES="${{ steps.analyze.outputs.total_size || 0 }}"
         MB=$(awk "BEGIN {printf \"%.2f\", (${BYTES})/1024/1024}")
 
-        # limit is kept for API parity with other actions
         LIMIT="${{ inputs.summary_limit }}"
         [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
 

@@ -69,6 +69,9 @@ jobs:
 | **Name**        | **Description**                          |
 |-----------------|------------------------------------------|
 | `image_digest`  | Pushed image manifest-list digest (sha)  |
+| `build_duration`| Duration in sec                          |
+| `image_size`    | Size in bytes                            |
+| `image_ref`     | Fully qualified `image@digest`           |
 
 ## 📋 Examples
 [View example →](./examples/base.yml)
