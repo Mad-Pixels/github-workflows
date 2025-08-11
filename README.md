@@ -12,29 +12,29 @@ This repository contains a collection of reusable **GitHub Actions** and **Reusa
 
 ## Available Actions
 
-### Taskfile
-| Action                                               | Description                  | Features                             |
-|------------------------------------------------------|------------------------------|--------------------------------------|
-| **[taskfile-runner](./actions/taskfile-runner)**     | Execute Taskfile commands    | Cross-platform task execution        |
+### 📋 Taskfile
+| Action                                               | Description                  |
+|------------------------------------------------------|------------------------------|
+| **[taskfile-runner](./actions/taskfile-runner)**     | Execute Taskfile commands    |
 
 ### 🐳 Container & Build
-| Action                                               | Description                  | Features                             |
-|------------------------------------------------------|------------------------------|--------------------------------------|
-| **[docker-build-push](./actions/docker-build-push)** | Multi-platform Docker builds | Buildx, multi-arch, registry support |
+| Action                                               | Description                  |
+|------------------------------------------------------|------------------------------|
+| **[docker-build-push](./actions/docker-build-push)** | Multi-platform Docker builds |
 
 ### ☁️  AWS Infrastructure  
-| Action                                                                   | Description                    | Features                                 |
-|--------------------------------------------------------------------------|--------------------------------|------------------------------------------|
-| **[aws-terraform-runner](./actions/aws-terraform-runner)**               | Terraform with S3 backend      | Plan/apply/destroy, workspace management |
-| **[aws-lambda-restart](./actions/aws-lambda-restart)**                   | Update Lambda container images | ECR integration, wait for completion     |
-| **[aws-s3-sync](./actions/aws-s3-sync)**                                 | Sync directory to S3           | Cache headers, exclude patterns          |
-| **[aws-cloudfront-invalidation](./actions/aws-cloudfront-invalidation)** | Invalidate CloudFront cache    | Batch operations, path wildcards         |
+| Action                                                                   | Description                    |
+|--------------------------------------------------------------------------|--------------------------------|
+| **[aws-terraform-runner](./actions/aws-terraform-runner)**               | Terraform with S3 backend      |
+| **[aws-lambda-restart](./actions/aws-lambda-restart)**                   | Update Lambda container images |
+| **[aws-s3-sync](./actions/aws-s3-sync)**                                 | Sync directory to S3           |
+| **[aws-cloudfront-invalidation](./actions/aws-cloudfront-invalidation)** | Invalidate CloudFront cache    |
 
 ### 🏷️ Git Operations
-| Action                                                   | Description               | Features                           |
-|----------------------------------------------------------|---------------------------|------------------------------------|
-| **[github-create-tag](./actions/github-create-tag)**     | Create validated git tags | Format validation, force overwrite |
-| **[github-check-branch](./actions/github-check-branch)** | Validate commit ancestry  | Branch reachability checks         |
+| Action                                                   | Description               |
+|----------------------------------------------------------|---------------------------|
+| **[github-create-tag](./actions/github-create-tag)**     | Create validated git tags |
+| **[github-check-branch](./actions/github-check-branch)** | Validate commit ancestry  |
 
 ## Contributing
 We ❤️ community contributions!
