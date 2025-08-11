@@ -13,6 +13,70 @@ This repository contains a collection of reusable **GitHub Actions** and **Reusa
 ## Available Actions
 
 ### 📋 Taskfile
+<table width="100%">
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><strong><a href="./actions/taskfile-runner">taskfile-runner</a></strong></td>
+<td>Execute Taskfile commands</td>
+</tr>
+</table>
+
+### 🐳 Container & Build
+<table width="100%">
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><strong><a href="./actions/docker-build-push">docker-build-push</a></strong></td>
+<td>Multi-platform Docker builds</td>
+</tr>
+</table>
+
+### ☁️  AWS Infrastructure  
+<table width="100%">
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><strong><a href="./actions/aws-terraform-runner">aws-terraform-runner</a></strong></td>
+<td>Terraform with S3 backend</td>
+</tr>
+<tr>
+<td><strong><a href="./actions/aws-lambda-restart">aws-lambda-restart</a></strong></td>
+<td>Update Lambda container images</td>
+</tr>
+<tr>
+<td><strong><a href="./actions/aws-s3-sync">aws-s3-sync</a></strong></td>
+<td>Sync directory to S3</td>
+</tr>
+<tr>
+<td><strong><a href="./actions/aws-cloudfront-invalidation">aws-cloudfront-invalidation</a></strong></td>
+<td>Invalidate CloudFront cache</td>
+</tr>
+</table>
+
+### 🏷️ Git Operations
+<table width="100%">
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+<tr>
+<td><strong><a href="./actions/github-create-tag">github-create-tag</a></strong></td>
+<td>Create validated git tags</td>
+</tr>
+<tr>
+<td><strong><a href="./actions/github-check-branch">github-check-branch</a></strong></td>
+<td>Validate commit ancestry</td>
+</tr>
+</table>
+
+### 📋 Taskfile
 | Action                                               | Description                  |
 |------------------------------------------------------|------------------------------|
 | **[taskfile-runner](./actions/taskfile-runner)**     | Execute Taskfile commands    |
