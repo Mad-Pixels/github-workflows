@@ -58,8 +58,12 @@ uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1.2.3
 uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
 ```
 
+## Support
+- 🐛 **Issues:** [GitHub Issues](https://github.com/Mad-Pixels/github-workflows/issues)
+- 💬 **Discussions:** [GitHub Discussions](https://github.com/Mad-Pixels/github-workflows/discussions)
+
 ## Contributing
-We ❤️ community contributions!
+We ❤️ community contributions! Please see our [Contributing Guide](./CONTRIBUTING.md) for details.
 
 ## License
 This repository is licensed under the [license](./LICENSE) _(Apache License 2.0)_.
