@@ -7,7 +7,7 @@
 # GitHub Workflows & Actions
 This repository contains a collection of reusable **GitHub Actions** and **Reusable Workflows** designed to simplify CI/CD pipelines.  
  
-> Each action and workflow is versioned and documented individually.
+> Each action and workflow is versioned and documented individually.  
 > You can browse their respective `README.md` files for details, inputs, outputs, and usage examples.
 
 ## Available Actions
@@ -35,6 +35,28 @@ This repository contains a collection of reusable **GitHub Actions** and **Reusa
 |---|---|
 | **[github-create-tag](./actions/github-create-tag)** | Create validated git tags |
 | **[github-check-branch](./actions/github-check-branch)** | Validate commit ancestry |    |
+
+## Versioning
+
+We use git tags. Pin consumers to stable majors, or exact releases when you need reproducibility. Tags are **repo-wide** (apply to all actions/workflows in this repo).
+
+| Ref | Stability | Description | When to use |
+|---|---|---|---|
+| `@main` | ⚠️ Unstable | Latest commit on default branch | Testing and development |
+| `@v1` | ✅ Stable | Moving major tag (non-breaking updates only) | **Recommended for production** |
+| `@v1.2.3` | ✅ Stable | Exact released version (immutable) | Reproducible builds, controlled rollouts |
+| `@<sha>` | 🔒 Frozen | Pinned commit (immutable) | Compliance/audit, maximum control |
+
+**Notes:**
+- Per-action tags like `@action-name/v1` are **not** supported by GitHub; tags are repository-scoped.
+- Breaking changes will bump the major (e.g., `v2`). The `v1` tag will continue to receive backward-compatible updates.
+
+**Examples:**
+```yaml
+uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1
+uses: Mad-Pixels/github-workflows/actions/taskfile-runner@v1.2.3
+uses: Mad-Pixels/github-workflows/actions/github-create-tag@v1
+```
 
 ## Contributing
 We ❤️ community contributions!
