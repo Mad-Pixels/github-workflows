@@ -37,23 +37,23 @@ jobs:
 ```
 
 ## 📥 Inputs
-| **Name**          | **Required** | **Description**                                              | **Default** |
-|-------------------|--------------|--------------------------------------------------------------|-------------|
-| `target_branch`   | ❌ No        | Branch to validate against (e.g., `main`, `release/v1`)      | `main`      |
-| `tag_name`        | ❌ No        | Tag name to validate; if empty, validates current `HEAD`     | ` `         |
-| `commit_sha`      | ❌ No        | Explicit commit SHA to validate (overrides `tag_name/HEAD`)  | ` `         |
-| `fail_on_invalid` | ❌ No        | Fail the action if not reachable ('true'/'false')            | ` `         |
-| `show_summary`    | ❌ No        | Print summary with task output in job summary                | `true`      |
-| `summary_limit`   | ❌ No        | Max number of output lines to show in summary                | `250`       |
+|**Name**|**Required**|**Description**|**Default**|
+|---|---|---|---|
+|`target_branch`|❌ No|Branch to validate against (e.g., `main`, `release/v1`)|`main`|
+|`tag_name`|❌ No|Tag name to validate; if empty, validates current `HEAD`|` `|
+|`commit_sha`|❌ No|Explicit commit SHA to validate (overrides `tag_name/HEAD`)|` `|
+|`fail_on_invalid`|❌ No|Fail the action if not reachable ('true'/'false')|` `|
+|`show_summary`|❌ No|Print summary with task output in job summary|`true`|
+|`summary_limit`|❌ No|Max number of output lines to show in summary|`250`|
 
 ## 📤 Outputs
-| **Name**        | **Description**                                                              |
-|-----------------|------------------------------------------------------------------------------|
-| `is_valid`      | `true` if commit/tag is reachable from target branch, else `false`           |
-| `commit`        | The validated commit SHA                                                     |
-| `subject`       | What was validated (`HEAD:<sha>`, `tag:<name>`, or `commit:<sha>`)           |
-| `target_branch` | The branch used for validation                                               |
-| `merge_base`    | Common ancestor SHA (only set when validation fails and histories intersect) |
+|**Name**|**Description**|
+|---|---|
+|`is_valid`|`true` if commit/tag is reachable from target branch, else `false`|
+|`commit`|The validated commit SHA|
+|`subject`|What was validated (`HEAD:<sha>`, `tag:<name>`, or `commit:<sha>`)|
+|`target_branch`|The branch used for validation|
+|`merge_base`|Common ancestor SHA (only set when validation fails and histories intersect)|
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

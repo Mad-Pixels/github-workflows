@@ -32,21 +32,21 @@ jobs:
 ```
 
 ## 📥 Inputs
-| **Name**        | **Required** | **Description**                                                                                                                              | **Default** |
-|-----------------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------|
-| `command`       | ✅ Yes       | Name of the task to run (e.g. build, test, lint)                                                                                             | -           |
-| `vars`          | ❌ No        | Comma-separated key=value pairs. Values may contain = and newlines; commas are not allowed. Leading/trailing spaces around pairs are trimmed | -           |
-| `dir`           | ❌ No        | Working directory for the Taskfile                                                                                                           | `.`         |
-| `version`       | ❌ No        | Version of go-task to install                                                                                                                | `3.44.1`    |
-| `show_summary`  | ❌ No        | Print summary with task output in job summary                                                                                                | `true`      |
-| `summary_limit` | ❌ No        | Max number of output lines to show in summary                                                                                                | `250`       |
+|**Name**|**Required**|**Description**|**Default**|
+|---|---|---|---|
+|`command`|✅ Yes|Name of the task to run (e.g. build, test, lint)|-|
+|`vars`|❌ No|Comma-separated key=value pairs. Values may contain = and newlines; commas are not allowed. Leading/trailing spaces around pairs are trimmed|-|
+|`dir`|❌ No| Working directory for the Taskfile|`.`|
+|`version`|❌ No| Version of go-task to install|`3.44.1`|
+|`show_summary`|❌ No| Print summary with task output in job summary|`true`|
+|`summary_limit`|❌ No| Max number of output lines to show in summary|`250`|
 
 ## 📤 Outputs
-| **Name**       | **Description**                    |
-|----------------|------------------------------------|
-| `task_version` | Installed Task version             |
-| `task_command` | Task command                       |
-| `task_output`  | Complete output from task command  |
+|**Name**|**Description**|
+|---|---|
+|`task_version`|Installed Task version|
+|`task_command`|Task command|
+|`task_output`|Complete output from task command|
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

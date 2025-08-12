@@ -48,24 +48,24 @@ jobs:
 ```
 
 ## 📥 Inputs
-| **Name**       | **Required** | **Description**                                                           | **Default**                       |
-|----------------|--------------|---------------------------------------------------------------------------|-----------------------------------|
-| `tag`          | ✅ Yes       | Tag to create (e.g., v1.2.3)                                              | -                                 |
-| `token`        | ✅ Yes       | GitHub token or PAT with `contents: write` permissions                    | -                                 |
-| `force`        | ❌ No        | Overwrite existing tag if it exists (`true`/`false`)                      | `false`                           |
-| `branch`       | ❌ No        | Branch to tag from                                                        | `main`                            |
-| `tag_format`   | ❌ No        | Regex to validate tag format                                              | `^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$` |
-| `message`      | ❌ No        | Message for annotated tag (ignored for lightweight tags)                  | -                                 |
-| `lightweight`  | ❌ No        | Create lightweight tag (overrides message) (`true`/`false`)               | `false`                           |
-| `show_summary` | ❌ No        | Print summary with task output in job summary                             | `true`                            |
-| `summary_limit`| ❌ No        | Max number of output lines to show in summary                             | `250`                             |
+|**Name**|**Required**|**Description**|**Default**|
+|---|---|---|---|
+|`tag`|✅ Yes|Tag to create (e.g., v1.2.3)|-|
+|`token`|✅ Yes|GitHub token or PAT with `contents: write` permissions|-|
+|`force`|❌ No|Overwrite existing tag if it exists (`true`/`false`)|`false`|
+|`branch`|❌ No|Branch to tag from|`main`|
+|`tag_format`|❌ No|Regex to validate tag format|`^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$`|
+|`message`|❌ No| Message for annotated tag (ignored for lightweight tags)|-|
+|`lightweight`|❌ No|Create lightweight tag (overrides message) (`true`/`false`)|`false`|
+|`show_summary`|❌ No|Print summary with task output in job summary|`true`|
+|`summary_limit`|❌ No|Max number of output lines to show in summary|`250`|
 
 ## 📤 Outputs
-| **Name**     | **Description**                                  |
-|--------------|--------------------------------------------------|
-| `tag_sha`    | SHA of the commit the tag points to              |
-| `tag_exists` | Whether the tag already existed before creation  |
-| `tag_url`    | GitHub URL to view the created tag               |
+|**Name**|**Description**|
+|---|---|
+|`tag_sha`|SHA of the commit the tag points to|
+|`tag_exists`|Whether the tag already existed before creation|
+|`tag_url`|GitHub URL to view the created tag|
 
 ## 📋 Examples
 [lightweight →](./examples/lightweight.yml)
