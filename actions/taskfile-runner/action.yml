@@ -189,7 +189,7 @@ runs:
 
         echo "✅ Task completed successfully"
 
-    - name: Task Runner Summary
+    - name: Summary
       if: inputs.show_summary != 'false'
       shell: bash
       continue-on-error: true

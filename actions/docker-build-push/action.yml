@@ -282,6 +282,7 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
       env:
         BUILD_ARGS_JSON: ${{ inputs.build_args }}
@@ -291,50 +292,60 @@ runs:
         REPO: ${{ inputs.repository }}
         TAG: ${{ inputs.tag }}
         LIMIT: ${{ inputs.summary_limit }}
+        CONTEXT: ${{ steps.ctx.outputs.context }}
+        DOCKERFILE_PATH: ${{ inputs.dockerfile_path }}
+        BUILD_OUTCOME: ${{ steps.build.outcome }}
+        DIGEST: ${{ steps.resolve_digest.outputs.digest }}
+        IMAGE_SIZE: ${{ steps.resolve_digest.outputs.image_size }}
+        IMAGE_REF: ${{ steps.resolve_digest.outputs.image_ref }}
+        BUILD_DURATION: ${{ steps.build.outputs.build_duration }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         STATUS_ICON="❌"
-        if [[ "${{ steps.build.outcome }}" == "success" ]]; then
-          STATUS_ICON="✅"
-        fi
+        [ "${BUILD_OUTCOME:-failure}" = "success" ] && STATUS_ICON="✅"
 
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
-
-        if [[ "$REGISTRY" != "docker.io" && "$REPO" != "${REGISTRY}/"* ]]; then
+        IMAGE="${REPO:-}"
+        if [ -n "${REGISTRY:-}" ] && [ "${REGISTRY}" != "docker.io" ] && [[ "${REPO:-}" != "${REGISTRY}/"* ]]; then
           IMAGE="${REGISTRY}/${REPO}"
-        else
-          IMAGE="${REPO}"
         fi
 
         {
           echo "## 🐳 Docker Build & Push ${STATUS_ICON}"
           echo "- **Image:** \`${IMAGE}\`"
           echo "- **Tags:**"
-          echo "  - \`${IMAGE}:${TAG}\`"
-          if [[ "${PUSH_LATEST}" == "true" ]]; then
+          echo "  - \`${IMAGE}:${TAG:-latest}\`"
+          if [ "${PUSH_LATEST:-false}" = "true" ]; then
             echo "  - \`${IMAGE}:latest\`"
           fi
-          echo "- **Platforms:** \`${PLATFORMS}\`"
-          echo "- **Dockerfile:** \`${{ steps.ctx.outputs.context }}/${{ inputs.dockerfile_path }}\`"
-          echo "- **Context:** \`${{ steps.ctx.outputs.context }}\`"
-          if [[ -n "${{ steps.resolve_digest.outputs.digest || '' }}" ]]; then
-            echo "- **Digest:** \`${{ steps.resolve_digest.outputs.digest }}\`"
-            echo "- **Build duration:** ${{ steps.build.outputs.build_duration || 'N/A' }} seconds"
-            echo "- **Image size:** ${{ steps.resolve_digest.outputs.image_size || 'N/A' }} bytes"
-            echo "- **Image ref:** \`${{ steps.resolve_digest.outputs.image_ref || '' }}\`"
+          echo "- **Platforms:** \`${PLATFORMS:-}\`"
+          echo "- **Dockerfile:** \`${CONTEXT:-}.${DOCKERFILE_PATH:+/${DOCKERFILE_PATH}}\`"
+          echo "- **Context:** \`${CONTEXT:-.}\`"
+
+          if [ -n "${DIGEST:-}" ]; then
+            echo "- **Digest:** \`${DIGEST}\`"
+            echo "- **Build duration:** ${BUILD_DURATION:-N/A} seconds"
+            echo "- **Image size:** ${IMAGE_SIZE:-N/A} bytes"
+            [ -n "${IMAGE_REF:-}" ] && echo "- **Image ref:** \`${IMAGE_REF}\`"
           fi
-          if [[ "${BUILD_ARGS_JSON}" != "{}" ]]; then
-            echo ""
+
+          if [ -n "${BUILD_ARGS_JSON:-}" ] && [ "${BUILD_ARGS_JSON}" != "{}" ]; then
+            echo
             echo "### Build args"
             echo '```json'
-            echo "${BUILD_ARGS_JSON}" | jq .
+            if command -v jq >/dev/null 2>&1; then
+              printf '%s\n' "${BUILD_ARGS_JSON}" | jq .
+            else
+              printf '%s\n' "${BUILD_ARGS_JSON}"
+            fi
             echo '```'
           fi
-          echo ""
-          if [[ "${{ steps.build.outcome }}" == "success" ]]; then
+
+          echo
+          if [ "${BUILD_OUTCOME:-failure}" = "success" ]; then
             echo "✅ **Build successful** — image pushed to registry"
           else
             echo "❌ **Build failed** — check logs for details"
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

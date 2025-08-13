@@ -247,35 +247,53 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
+      env:
+        LIMIT: ${{ inputs.summary_limit }}
+        OUTCOME: ${{ steps.sync.outcome }}
+        BUCKET: ${{ inputs.bucket_name }}
+        SOURCE_DIR: ${{ inputs.source_dir }}
+        S3_URL: ${{ steps.url.outputs.s3_url }}
+        AWS_REGION: ${{ inputs.aws_region }}
+        DELETE_REMOVED: ${{ inputs.delete_removed }}
+        CACHE_CONTROL: ${{ inputs.cache_control }}
+        CT_DETECTION: ${{ inputs.content_type_detection }}
+        EXCLUDES: ${{ inputs.exclude_patterns }}
+        FILES_UPLOADED: ${{ steps.sync.outputs.files_uploaded }}
+        FILES_DELETED: ${{ steps.sync.outputs.files_deleted }}
+        FILE_COUNT: ${{ steps.analyze.outputs.file_count }}
+        TOTAL_SIZE: ${{ steps.analyze.outputs.total_size }}
+        SYNC_DURATION: ${{ steps.sync.outputs.sync_duration }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
-        OUTCOME="${{ steps.sync.outcome }}"
-        STATUS_ICON="❌"; [[ "$OUTCOME" == "success" ]] && STATUS_ICON="✅"
-        BYTES="${{ steps.analyze.outputs.total_size || 0 }}"
-        MB=$(awk "BEGIN {printf \"%.2f\", (${BYTES})/1024/1024}")
+        STATUS_ICON="❌"
+        [ "${OUTCOME:-failure}" = "success" ] && STATUS_ICON="✅"
 
-        LIMIT="${{ inputs.summary_limit }}"
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+        BYTES="${TOTAL_SIZE:-0}"
+        if [[ -z "$BYTES" || ! "$BYTES" =~ ^[0-9]+$ ]]; then BYTES=0; fi
+        MB=$(awk "BEGIN {printf \"%.2f\", ($BYTES)/1024/1024}")
 
         {
           echo "## ☁️ S3 Sync ${STATUS_ICON}"
-          echo "- **Bucket:** \`${{ inputs.bucket_name }}\`"
-          echo "- **Source:** \`${{ inputs.source_dir }}\`"
-          echo "- **Target:** \`${{ steps.url.outputs.s3_url }}\`"
-          echo "- **Region:** \`${{ inputs.aws_region }}\`"
-          echo "- **Delete removed:** \`${{ inputs.delete_removed }}\`"
-          echo "- **Cache-Control:** \`${{ inputs.cache_control || 'N/A' }}\`"
-          echo "- **Content-Type detection:** \`${{ inputs.content_type_detection }}\`"
-          echo "- **Excludes:** \`${{ inputs.exclude_patterns }}\`"
-          if [[ "$OUTCOME" == "success" ]]; then
-            echo "- **Files uploaded:** \`${{ steps.sync.outputs.files_uploaded || '0' }}\`"
-            echo "- **Files deleted:** \`${{ steps.sync.outputs.files_deleted || '0' }}\`"
-            echo "- **Total files:** \`${{ steps.analyze.outputs.file_count || '0' }}\`"
+          echo "- **Bucket:** \`${BUCKET:-}\`"
+          echo "- **Source:** \`${SOURCE_DIR:-}\`"
+          echo "- **Target:** \`${S3_URL:-}\`"
+          echo "- **Region:** \`${AWS_REGION:-}\`"
+          echo "- **Delete removed:** \`${DELETE_REMOVED:-false}\`"
+          echo "- **Cache-Control:** \`${CACHE_CONTROL:-N/A}\`"
+          echo "- **Content-Type detection:** \`${CT_DETECTION:-true}\`"
+          echo "- **Excludes:** \`${EXCLUDES:-}\`"
+
+          if [ "${OUTCOME:-failure}" = "success" ]; then
+            echo "- **Files uploaded:** \`${FILES_UPLOADED:-0}\`"
+            echo "- **Files deleted:** \`${FILES_DELETED:-0}\`"
+            echo "- **Total files:** \`${FILE_COUNT:-0}\`"
             echo "- **Total size:** \`${BYTES}\` bytes (~${MB} MiB)"
-            echo "- **Sync duration:** \`${{ steps.sync.outputs.sync_duration || 'N/A' }}\` seconds"
+            echo "- **Sync duration:** \`${SYNC_DURATION:-N/A}\` seconds"
           else
-            echo "- **Status:** Sync failed — check logs above"
+            echo "- **Status:** Sync failed — check logs for details"
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

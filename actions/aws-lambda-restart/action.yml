@@ -201,29 +201,37 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
+      env:
+        LIMIT: ${{ inputs.summary_limit }}
+        UPDATE_OUTCOME: ${{ steps.update_code.outcome }}
+        FUNCTION_NAME: ${{ inputs.function_name }}
+        AWS_REGION: ${{ inputs.aws_region }}
+        IMAGE_URI: ${{ steps.resolve_image.outputs.image_uri }}
+        FUNCTION_ARN: ${{ steps.update_code.outputs.function_arn }}
+        CODE_SHA256: ${{ steps.update_code.outputs.code_sha256 }}
+        LAST_MODIFIED: ${{ steps.update_code.outputs.last_modified }}
+        WAIT_FOR_UPDATE: ${{ inputs.wait_for_update }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         STATUS_ICON="❌"
-        if [[ "${{ steps.update_code.outcome }}" == "success" ]]; then
-          STATUS_ICON="✅"
-        fi
-
-        LIMIT="${{ inputs.summary_limit }}"
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+        [ "${UPDATE_OUTCOME:-failure}" = "success" ] && STATUS_ICON="✅"
 
         {
           echo "## 🚀 Lambda Update ${STATUS_ICON}"
-          echo "- **Function:** \`${{ inputs.function_name }}\`"
-          echo "- **Region:** \`${{ inputs.aws_region }}\`"
-          echo "- **Image:** \`${{ steps.resolve_image.outputs.image_uri || 'N/A' }}\`"
-          if [[ "${{ steps.update_code.outcome }}" == "success" ]]; then
-            echo "- **Function ARN:** \`${{ steps.update_code.outputs.function_arn || 'N/A' }}\`"
-            echo "- **Code SHA256:** \`${{ steps.update_code.outputs.code_sha256 || 'N/A' }}\`"
-            echo "- **Last Modified:** \`${{ steps.update_code.outputs.last_modified || 'N/A' }}\`"
-            echo "- **Waited for Active:** \`${{ inputs.wait_for_update }}\`"
+          echo "- **Function:** \`${FUNCTION_NAME:-}\`"
+          echo "- **Region:** \`${AWS_REGION:-}\`"
+          echo "- **Image:** \`${IMAGE_URI:-N/A}\`"
+
+          if [ "${UPDATE_OUTCOME:-failure}" = "success" ]; then
+            echo "- **Function ARN:** \`${FUNCTION_ARN:-N/A}\`"
+            echo "- **Code SHA256:** \`${CODE_SHA256:-N/A}\`"
+            echo "- **Last Modified:** \`${LAST_MODIFIED:-N/A}\`"
+            echo "- **Waited for Active:** \`${WAIT_FOR_UPDATE:-false}\`"
           else
-            echo "- **Status:** Update failed — check logs above"
+            echo "- **Status:** Update failed — check logs for details"
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

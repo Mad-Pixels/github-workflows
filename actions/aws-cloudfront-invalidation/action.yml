@@ -189,56 +189,67 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
+      env:
+        LIMIT: ${{ inputs.summary_limit }}
+        DIST: ${{ inputs.distribution_id }}
+        PATHS_RAW: ${{ inputs.paths }}
+        WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
+        INVALIDATION_ID: ${{ steps.invalidate.outputs.invalidation_id }}
+        INVALIDATION_STATUS: ${{ steps.invalidate.outputs.status }}
+        CALLER_REFERENCE: ${{ steps.invalidate.outputs.caller_reference }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         STATUS_ICON="❌"
-        [[ -n "${{ steps.invalidate.outputs.invalidation_id }}" ]] && STATUS_ICON="✅"
+        [ -n "${INVALIDATION_ID:-}" ] && STATUS_ICON="✅"
 
-        DIST="${{ inputs.distribution_id }}"
-        ID="${{ steps.invalidate.outputs.invalidation_id }}"
         CF_LINK=""
-        if [[ -n "$DIST" && -n "$ID" ]]; then
-          CF_LINK="https://console.aws.amazon.com/cloudfront/v4/home#/distributions/${DIST}/invalidations/${ID}"
+        if [ -n "${DIST:-}" ] && [ -n "${INVALIDATION_ID:-}" ]; then
+          CF_LINK="https://console.aws.amazon.com/cloudfront/v4/home#/distributions/${DIST}/invalidations/${INVALIDATION_ID}"
         fi
 
-        LIMIT="${{ inputs.summary_limit }}"
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
-
-        PATHS_RAW='${{ inputs.paths }}'
-
+        RAW="${PATHS_RAW//$'\n'/ }"
         set -f
-        IFS=' ' read -r -a P_ARR <<< "$PATHS_RAW"
+        IFS=' ' read -r -a P_ARR <<< "${RAW}"
         set +f
 
-        TOTAL="${#P_ARR[@]}"
-        SHOW="$LIMIT"; (( TOTAL < LIMIT )) && SHOW="$TOTAL"
+        PATHS=()
+        for p in "${P_ARR[@]}"; do
+          [ -n "$p" ] && PATHS+=("$p")
+        done
+
+        TOTAL="${#PATHS[@]}"
+        SHOW="$LIMIT"; [ "$TOTAL" -lt "$LIMIT" ] && SHOW="$TOTAL"
 
         {
           echo "## 📊 CloudFront Invalidation ${STATUS_ICON}"
-          echo "- **Invalidation ID:** \`${ID:-N/A}\`"
-          echo "- **Status:** \`${{ steps.invalidate.outputs.status || 'N/A' }}\`"
-          echo "- **CallerReference:** \`${{ steps.invalidate.outputs.caller_reference || 'auto' }}\`"
-          echo "- **Distribution:** \`${DIST}\`"
-          echo ""
-          if (( TOTAL > 0 )); then
-            if (( TOTAL <= LIMIT )); then
+          echo "- **Invalidation ID:** \`${INVALIDATION_ID:-N/A}\`"
+          echo "- **Status:** \`${INVALIDATION_STATUS:-N/A}\`"
+          echo "- **CallerReference:** \`${CALLER_REFERENCE:-auto}\`"
+          echo "- **Distribution:** \`${DIST:-}\`"
+          [ -n "$CF_LINK" ] && echo "- **Console:** ${CF_LINK}"
+
+          echo
+          if [ "$TOTAL" -gt 0 ]; then
+            if [ "$TOTAL" -le "$LIMIT" ]; then
               echo "### Paths"
             else
               echo "### Paths (first ${LIMIT} of ${TOTAL})"
             fi
             echo '```'
-            for ((i=0;i<SHOW;i++)); do
-              printf '%s\n' "${P_ARR[i]}"
+            for ((i=0; i<SHOW; i++)); do
+              printf '%s\n' "${PATHS[i]}"
             done
             echo '```'
           fi
 
-          echo ""
-          if [[ "${{ inputs.wait_for_completion }}" == "true" ]]; then
+          echo
+          if [ "${WAIT_FOR_COMPLETION:-false}" = "true" ]; then
             echo "⏱️ Waited for completion: **true**"
           else
             echo "⏱️ Waited for completion: **false** (status may change to *Completed* in ~10–15 minutes)"
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

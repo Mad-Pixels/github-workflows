@@ -242,35 +242,51 @@ runs:
 
     - name: Terraform Summary
       if: inputs.show_summary != 'false'
+      continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.tf_dir }}
+      env:
+        LIMIT: ${{ inputs.summary_limit }}
+        TF_COMMAND: ${{ inputs.tf_command }}
+        TF_DIR: ${{ inputs.tf_dir }}
+        TF_WORKSPACE: ${{ inputs.tf_workspace }}
+        TF_VERSION: ${{ steps.collect.outputs.terraform_version }}
+        BACKEND_BUCKET: ${{ inputs.backend_bucket }}
+        BACKEND_KEY: ${{ inputs.backend_key }}
+        BACKEND_REGION: ${{ inputs.backend_region }}
+        AWS_REGION: ${{ inputs.aws_region }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
-        WS="${{ inputs.tf_workspace != '' && inputs.tf_workspace || 'default' }}"
-        TFV="${{ steps.collect.outputs.terraform_version }}"
-
-        LIMIT_RAW="${{ inputs.summary_limit }}"
-        if ! [[ "$LIMIT_RAW" =~ ^[0-9]+$ ]]; then LIMIT=250; else LIMIT="$LIMIT_RAW"; fi
+        WS="${TF_WORKSPACE:-}"
+        [ -z "$WS" ] && WS="default"
 
         {
           echo "## 🛠️ Terraform Execution Summary"
-          echo "- **Command:** \`${{ inputs.tf_command }}\`"
-          echo "- **Directory:** \`${{ inputs.tf_dir }}\`"
-          echo "- **Workspace:** \`$WS\`"
-          echo "- **Terraform version:** \`$TFV\`"
-          echo "- **Backend:** S3 \`${{ inputs.backend_bucket }}:${{ inputs.backend_key }}\`"
-          echo "  in \`${{ inputs.backend_region }}\`"
-          echo "- **AWS region (vars):** \`${{ inputs.aws_region }}\`"
+          echo "- **Command:** \`${TF_COMMAND:-}\`"
+          echo "- **Directory:** \`${TF_DIR:-.}\`"
+          echo "- **Workspace:** \`${WS}\`"
+          [ -n "${TF_VERSION:-}" ] && echo "- **Terraform version:** \`${TF_VERSION}\`"
+          if [ -n "${BACKEND_BUCKET:-}" ] && [ -n "${BACKEND_KEY:-}" ]; then
+            echo "- **Backend:** S3 \`${BACKEND_BUCKET}:${BACKEND_KEY}\`"
+            [ -n "${BACKEND_REGION:-}" ] && echo "  in \`${BACKEND_REGION}\`"
+          fi
+          [ -n "${AWS_REGION:-}" ] && echo "- **AWS region (vars):** \`${AWS_REGION}\`"
 
-          if [[ "${{ inputs.tf_command }}" == "plan" && -f "tfplan" ]]; then
-            echo ""
-            TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
-            echo "### 📄 Plan (first ${LIMIT} lines${TOTAL_LINES:+ of ${TOTAL_LINES}})"
-            terraform show -no-color tfplan | sed -n "1,${LIMIT}p"
-            if [[ -n "$TOTAL_LINES" && "$TOTAL_LINES" -gt "$LIMIT" ]]; then
-              echo ""
-              echo "_…truncated, total lines: $TOTAL_LINES_"
+          if [ "${TF_COMMAND:-}" = "plan" ] && [ -f tfplan ]; then
+            echo
+            if command -v terraform >/dev/null 2>&1; then
+              TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
+              echo "### 📄 Plan (first ${LIMIT} lines${TOTAL_LINES:+ of ${TOTAL_LINES}})"
+              terraform show -no-color tfplan | sed -n "1,${LIMIT}p"
+              if [ -n "${TOTAL_LINES:-}" ] && [ "$TOTAL_LINES" -gt "$LIMIT" ]; then
+                echo
+                echo "_…truncated, total lines: $TOTAL_LINES_"
+              fi
+            else
+              echo "### 📄 Plan"
+              echo "_terraform binary not available to render plan output_"
             fi
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

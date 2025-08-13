@@ -205,36 +205,43 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
       env:
         LIMIT: ${{ inputs.summary_limit }}
+        TAG_NAME: ${{ env.TAG_NAME }}
+        BRANCH_NAME: ${{ env.BRANCH_NAME }}
+        FORCE_CREATE: ${{ env.FORCE_CREATE }}
+        LIGHTWEIGHT: ${{ env.LIGHTWEIGHT }}
+        TAG_MESSAGE: ${{ env.TAG_MESSAGE }}
+        TAG_SHA: ${{ steps.create_tag.outputs.tag_sha }}
+        TAG_URL: ${{ steps.create_tag.outputs.tag_url }}
       run: |
-        set -euo pipefail
-
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         TYPE="Annotated"
-        if [ "${LIGHTWEIGHT}" = "true" ]; then
-          TYPE="Lightweight"
-        fi
+        [ "${LIGHTWEIGHT:-false}" = "true" ] && TYPE="Lightweight"
 
         {
           echo "## 🏷️ Tag Created"
-          echo "- **Tag:** ${TAG_NAME}"
-          echo "- **SHA:** ${{ steps.create_tag.outputs.tag_sha }}"
-          echo "- **Branch:** ${BRANCH_NAME}"
+          echo "- **Tag:** ${TAG_NAME:-}"
+          echo "- **SHA:** ${TAG_SHA:-}"
+          echo "- **Branch:** ${BRANCH_NAME:-}"
           echo "- **Type:** ${TYPE}"
-          echo "- **Force:** ${FORCE_CREATE}"
-          echo "- **Tag URL:** [View Tag](${{ steps.create_tag.outputs.tag_url }})"
+          echo "- **Force:** ${FORCE_CREATE:-false}"
+          if [ -n "${TAG_URL:-}" ]; then
+            echo "- **Tag URL:** [View Tag](${TAG_URL})"
+          fi
 
-          if [ -n "${TAG_MESSAGE// }" ]; then
-            echo ""
+          if [ -n "${TAG_MESSAGE//[[:space:]]/}" ]; then
+            echo
             echo "### Message"
             echo '```'
             printf "%s\n" "${TAG_MESSAGE}" | awk -v lim="$LIMIT" 'NR<=lim{print}'
             echo '```'
           fi
 
-          echo ""
+          echo
           echo "🎉 Tagging complete!"
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true

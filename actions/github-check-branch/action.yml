@@ -184,38 +184,42 @@ runs:
 
     - name: Summary
       if: always() && inputs.show_summary == 'true'
+      continue-on-error: true
       shell: bash
       env:
         LIMIT: ${{ inputs.summary_limit }}
+        TARGET_BRANCH: ${{ inputs.target_branch }}
+        SUBJECT: ${{ steps.validate.outputs.subject }}
+        COMMIT: ${{ steps.validate.outputs.commit }}
+        IS_VALID: ${{ steps.validate.outputs.is_valid }}
+        MERGE_BASE: ${{ steps.validate.outputs.merge_base }}
+        FAIL_ON_INVALID: ${{ inputs.fail_on_invalid }}
       run: |
-        set -euo pipefail
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         RESULT_ICON="❌"
-        if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
-          RESULT_ICON="✅"
-        fi
-
-        # LIMIT kept for interface parity (not used for truncation here)
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT="250"
+        [ "${IS_VALID:-false}" = "true" ] && RESULT_ICON="✅"
 
         {
           echo "## 🔎 Branch Validator ${RESULT_ICON}"
-          echo "- **Target branch:** \`${{ inputs.target_branch }}\`"
-          echo "- **Subject:** \`${{ steps.validate.outputs.subject || 'N/A' }}\`"
-          echo "- **Commit:** \`${{ steps.validate.outputs.commit || 'N/A' }}\`"
-          echo "- **Reachable:** \`${{ steps.validate.outputs.is_valid || 'false' }}\`"
+          echo "- **Target branch:** \`${TARGET_BRANCH:-}\`"
+          echo "- **Subject:** \`${SUBJECT:-N/A}\`"
+          echo "- **Commit:** \`${COMMIT:-N/A}\`"
+          echo "- **Reachable:** \`${IS_VALID:-false}\`"
 
-          if [ -n "${{ steps.validate.outputs.merge_base || '' }}" ]; then
-            echo "- **Common ancestor:** \`${{ steps.validate.outputs.merge_base }}\`"
+          if [ -n "${MERGE_BASE:-}" ]; then
+            echo "- **Common ancestor:** \`${MERGE_BASE}\`"
           fi
-          echo ""
-          if [ "${{ steps.validate.outputs.is_valid || 'false' }}" = "true" ]; then
+
+          echo
+          if [ "${IS_VALID:-false}" = "true" ]; then
             echo "✅ **Validation passed** — commit is reachable from target branch"
           else
             echo "❌ **Validation failed** — commit is not reachable from target branch"
-            if [ "${{ inputs.fail_on_invalid }}" = "false" ]; then
-              echo ""
+            if [ "${FAIL_ON_INVALID:-true}" = "false" ]; then
+              echo
               echo "ℹ️ Action continued due to \`fail_on_invalid: false\`"
             fi
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
