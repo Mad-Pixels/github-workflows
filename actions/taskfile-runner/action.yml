@@ -192,11 +192,13 @@ runs:
     - name: Task Runner Summary
       if: inputs.show_summary != 'false'
       shell: bash
+      continue-on-error: true
+      env:
+        OUT: ${{ steps.run.outputs.output }}
+        LIMIT: ${{ inputs.summary_limit }}
       run: |
-        set -euo pipefail
-        OUT="${{ steps.run.outputs.output }}"
-        LIMIT="${{ inputs.summary_limit }}"
-        if ! [[ "$LIMIT" =~ ^[0-9]+$ ]]; then LIMIT=250; fi
+        set -eo pipefail
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
 
         {
           echo "## 🧰 Task Runner Summary"
@@ -204,8 +206,8 @@ runs:
           echo "- Directory: \`${{ inputs.dir }}\`"
           echo "- Task version: \`${{ steps.install.outputs.version }}\`"
 
-          if [ -n "$OUT" ]; then
-            echo ""
+          if [ -n "${OUT:-}" ]; then
+            echo
             TOTAL=$(printf "%s\n" "$OUT" | wc -l | awk '{print $1}')
             if [ "$TOTAL" -le "$LIMIT" ]; then
               echo "### 🧾 Task output"
@@ -216,4 +218,4 @@ runs:
             printf "%s\n" "$OUT" | awk -v lim="$LIMIT" 'NR<=lim{print}'
             echo '```'
           fi
-        } >> "$GITHUB_STEP_SUMMARY"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
