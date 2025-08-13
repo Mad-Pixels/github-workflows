@@ -10,6 +10,8 @@ This repository contains a collection of reusable **GitHub Actions** and **Reusa
 > Each action and workflow is versioned and documented individually.  
 > You can browse their respective `README.md` files for details, inputs, outputs, and usage examples.
 
+Please visit [concept](./CONCEPT.md) docs to see how you can use [Taskfile](http://taskfile.dev) for CI process.
+
 ## Available Actions
 
 ### 📋 Taskfile
