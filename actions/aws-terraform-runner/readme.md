@@ -48,29 +48,29 @@ jobs:
 ```
 
 ## 📥 Inputs
-| **Name**                | **Required** | **Description**                                                                 | **Default**  |
-|-------------------------|--------------|---------------------------------------------------------------------------------|--------------|
-| `backend_bucket`        | ✅ Yes       | S3 bucket for storing Terraform state                                           | -            |
-| `backend_region`        | ✅ Yes       | AWS region for S3 backend                                                       | -            |
-| `backend_key`           | ✅ Yes       | S3 key (path) for Terraform state                                               | -            |
-| `aws_region`            | ✅ Yes       | AWS region                                                                      | -            |
-| `tf_command`            | ✅ Yes       | Terraform command: `plan`, `apply`, or `destroy`                                | -            |
-| `tf_dir`                | ✅ Yes       | Path to Terraform configuration directory                                       | -            |
-| `aws_access_key_id`     | ❌ No        | AWS access key ID (optional if using OIDC)                                      | -            |
-| `aws_secret_access_key` | ❌ No        | AWS secret access key (optional if using OIDC)                                  | -            |
-| `role_to_assume`        | ❌ No        | AWS IAM role ARN for OIDC authentication                                        | -            |
-| `tf_workspace`          | ❌ No        | Terraform workspace name                                                        | `""`         |
-| `tf_vars`               | ❌ No        | Extra CLI `-var` flags                                                          | `""`         |
-| `tf_version`            | ❌ No        | Terraform version                                                               | `1.8.5`      |
-| `show_summary`          | ❌ No        | Print summary with task output in job summary                                   | `true`       |
-| `summary_limit`         | ❌ No        | Max number of output lines to show in summary                                   | `500`        |
+|**Name**|**Required**|**Description**|**Default**|
+|---|---|---|---|
+|`backend_bucket`|✅ Yes|S3 bucket for storing Terraform state|-|
+|`backend_region`|✅ Yes|AWS region for S3 backend|-|
+|`backend_key`|✅ Yes|S3 key (path) for Terraform state|-|
+|`aws_region`|✅ Yes|AWS region|-|
+|`tf_command`|✅ Yes|Terraform command: `plan`, `apply`, or `destroy`|-|
+|`tf_dir`|✅ Yes|Path to Terraform configuration directory|-|
+|`aws_access_key_id`|❌ No| AWS access key ID (optional if using OIDC)|-|
+|`aws_secret_access_key`|❌ No|AWS secret access key (optional if using OIDC)|-|
+|`role_to_assume`|❌ No|AWS IAM role ARN for OIDC authentication|-|
+|`tf_workspace`|❌ No| Terraform workspace name|`""`|
+|`tf_vars`|❌ No| Extra CLI `-var` flags|`""`|
+|`tf_version`|❌ No|Terraform version|`1.8.5`|
+|`show_summary`|❌ No| Print summary with task output in job summary|`true`|
+|`summary_limit`|❌ No| Max number of output lines to show in summary|`500`|
 
 ## 📤 Outputs
-| **Name**            | **Description**                                          |
-|---------------------|----------------------------------------------------------|
-| `terraform_command` | Executed Terraform command (`plan`/`apply`/`destroy`)    |
-| `workspace`         | Workspace used during execution                          |
-| `terraform_version` | Used terraform version                                   |
+|**Name**|**Description**|
+|---|---|
+|`terraform_command`|Executed Terraform command (`plan`/`apply`/`destroy`)|
+|`workspace`|Workspace used during execution|
+|`terraform_version`|Used terraform version|
 
 ## 📋 Examples
 [View example →](./examples/base.yml)

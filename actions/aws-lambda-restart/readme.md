@@ -44,28 +44,28 @@ jobs:
 ```
 
 ## 📥 Inputs
-| **Name**                 | **Required** | **Description**                                                                      | **Default** |
-|--------------------------|--------------|--------------------------------------------------------------------------------------|-------------|
-| `function_name`          | ✅ Yes       | Full Lambda function name                                                            | -           |
-| `aws_region`             | ✅ Yes       | AWS region                                                                           | -           |
-| `aws_account_id`         | ⚠️ Cond.     | AWS account ID (12 digits) — required only when using `repository` + `image_tag`     | -           |
-| `aws_access_key_id`      | ❌ No        | AWS access key ID (optional if using OIDC)                                           | -           |
-| `aws_secret_access_key`  | ❌ No        | AWS secret access key (optional if using OIDC)                                       | -           |
-| `role_to_assume`         | ❌ No        | AWS IAM role ARN to assume (for OIDC authentication)                                 | -           |
-| `image_uri`              | ❌ No        | Full ECR image URI (overrides `repository`/`image_tag` when provided)                | -           |
-| `repository`             | ❌ No        | ECR repository name (used if `image_uri` not provided)                               | -           |
-| `image_tag`              | ❌ No        | ECR image tag (used with `repository`)                                               | `latest`    |
-| `wait_for_update`        | ❌ No        | Wait for function update to complete (`true`/`false`)                                | `true`      |
-| `show_summary`           | ❌ No        | Print summary with task output in job summary                                        | `true`      |
-| `summary_limit`          | ❌ No        | Max number of output lines to show in summary                                        | `250`       |
+|**Name**|**Required**|**Description**|**Default**|
+|---|---|---|---|
+|`function_name`|✅ Yes|Full Lambda function name|-|
+|`aws_region`|✅ Yes|AWS region|-|
+|`aws_account_id`|⚠️ Cond.|AWS account ID (12 digits) — required only when using `repository` + `image_tag`|-|
+|`aws_access_key_id`|❌ No|AWS access key ID (optional if using OIDC)|-|
+|`aws_secret_access_key`|❌ No|AWS secret access key (optional if using OIDC)|-|
+|`role_to_assume`|❌ No| AWS IAM role ARN to assume (for OIDC authentication)|-|
+|`image_uri`|❌ No|Full ECR image URI (overrides `repository`/`image_tag` when provided)|-|
+|`repository`|❌ No|ECR repository name (used if `image_uri` not provided)|-|
+|`image_tag`|❌ No|ECR image tag (used with `repository`)|`latest`|
+|`wait_for_update`|❌ No|Wait for function update to complete (`true`/`false`)|`true`|
+|`show_summary`|❌ No|Print summary with task output in job summary|`true`|
+|`summary_limit`|❌ No|Max number of output lines to show in summary|`250`|
 
 ## 📤 Outputs
-| **Name**         | **Description**                         |
-|------------------|-----------------------------------------|
-| `function_arn`   | Lambda function ARN                     |
-| `last_modified`  | Function last modified timestamp        |
-| `code_sha256`    | Lambda code SHA256                      |
-| `imgae_url`      | Resolved image URI                      |
+|**Name**|**Description**|
+|---|---|
+|`function_arn`|Lambda function ARN|
+|`last_modified`|Function last modified timestamp|
+|`code_sha256`|Lambda code SHA256|
+|`imgae_url`|Resolved image URI|
 
 ## 📋 Examples
 [View example →](./examples/base.yml)
