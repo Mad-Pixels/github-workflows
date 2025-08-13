@@ -4,6 +4,8 @@
  <img alt="MadPixels" src="https://github.com/Mad-Pixels/.github/raw/main/profile/banner.png">
 </picture>
 
+[![License](https://img.shields.io/github/license/Mad-Pixels/github-workflows?style=flat-square)](LICENSE) [![Latest Release](https://img.shields.io/github/v/release/Mad-Pixels/github-workflows?style=flat-square&logo=github)](https://github.com/Mad-Pixels/github-workflows/releases/latest)
+
 # GitHub Workflows & Actions
 This repository contains a collection of reusable **GitHub Actions** and **Reusable Workflows** designed to simplify CI/CD pipelines.  
  
