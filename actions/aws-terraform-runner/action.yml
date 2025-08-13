@@ -240,7 +240,7 @@ runs:
         write_output terraform_version "$TFV"
         write_output workspace "$WS"
 
-    - name: Terraform Summary
+    - name: Summary
       if: inputs.show_summary != 'false'
       continue-on-error: true
       shell: bash
@@ -257,7 +257,7 @@ runs:
         AWS_REGION: ${{ inputs.aws_region }}
       run: |
         set -eo pipefail
-        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=250
+        [[ "$LIMIT" =~ ^[0-9]+$ ]] || LIMIT=50
 
         WS="${TF_WORKSPACE:-}"
         [ -z "$WS" ] && WS="default"
@@ -273,20 +273,109 @@ runs:
             [ -n "${BACKEND_REGION:-}" ] && echo "  in \`${BACKEND_REGION}\`"
           fi
           [ -n "${AWS_REGION:-}" ] && echo "- **AWS region (vars):** \`${AWS_REGION}\`"
+        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
 
-          if [ "${TF_COMMAND:-}" = "plan" ] && [ -f tfplan ]; then
-            echo
-            if command -v terraform >/dev/null 2>&1; then
-              TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
+        if [ "${TF_COMMAND:-}" = "plan" ] && [ -f tfplan ]; then
+          if command -v jq >/dev/null 2>&1; then
+            terraform show -json tfplan > /tmp/plan.json || true
+
+            ADDS=$(jq '[.resource_changes[]? | select(.change.actions == ["create"])] | length' /tmp/plan.json 2>/dev/null || echo 0)
+            UPDS=$(jq '[.resource_changes[]? | select(.change.actions == ["update"])] | length' /tmp/plan.json 2>/dev/null || echo 0)
+            REPL=$(jq '[.resource_changes[]? | select(.change.actions == ["delete","create"])] | length' /tmp/plan.json 2>/dev/null || echo 0)
+            DELS=$(jq '[.resource_changes[]? | select(.change.actions == ["delete"])] | length' /tmp/plan.json 2>/dev/null || echo 0)
+            TOTAL=$((ADDS+UPDS+REPL+DELS))
+
+            {
+              echo
+              echo "### 📋 Change summary"
+              echo "- ➕ **create:** ${ADDS}"
+              echo "- ✏️ **update:** ${UPDS}"
+              echo "- 🔁 **replace:** ${REPL}"
+              echo "- ➖ **delete:** ${DELS}"
+              echo "- **total:** ${TOTAL}"
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
+
+            {
+              echo
+              echo "### 🔎 Top ${LIMIT} changes"
+              echo
+              jq -r --argjson limit "$LIMIT" '
+                .resource_changes // [] |
+                map({addr: .address, act: .change.actions}) |
+                map({
+                  addr,
+                  badge:
+                    (if .act==["create"] then "➕ create"
+                    elif .act==["update"] then "✏️ update"
+                    elif .act==["delete","create"] then "🔁 replace"
+                    elif .act==["delete"] then "➖ delete"
+                    else (.act|join(",")) end)
+                }) |
+                sort_by(
+                  (if .badge|test("^➕") then 0
+                  elif .badge|test("^✏️") then 1
+                  elif .badge|test("^🔁") then 2
+                  elif .badge|test("^➖") then 3
+                  else 4 end),
+                  .addr
+                ) |
+                .[:$limit] |
+                if length==0 then "*(no resource changes)*"
+                else map("- `\(.addr)` — **\(.badge)**")[] end
+              ' /tmp/plan.json
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
+
+            {
+              echo
+              echo "<details>"
+              echo "<summary>Show attribute-level changes (first ${LIMIT})</summary>"
+              echo
+              echo '```'
+              jq -r --argjson limit "$LIMIT" '
+                .resource_changes // [] |
+                .[:$limit] |
+                .[] |
+                .address as $a |
+                .change.actions as $act |
+                (
+                  if $act==["create"] then "CREATE " + $a
+                  elif $act==["update"] then "UPDATE " + $a
+                  elif $act==["delete","create"] then "REPLACE " + $a
+                  elif $act==["delete"] then "DELETE " + $a
+                  else ( ($act|join(",")) + " " + $a) end
+                ) as $head |
+                (
+                  .change.after_unknown // {} | keys_unsorted[]? |
+                  "  ~ unknown: " + .
+                ),
+                (
+                  .change.before? as $b |
+                  .change.after?  as $c |
+                  ([$b,$c] | any) |
+                  if . then
+                    ( ($b // {}) as $bb | ($c // {}) as $cc |
+                      ( ($bb|keys_unsorted + $cc|keys_unsorted) | unique )[] |
+                      select( ($bb[.]|tostring) != ($cc[.]|tostring) ) |
+                      "  ~ " + .
+                    )
+                  else empty end
+                )
+              ' /tmp/plan.json
+              echo '```'
+              echo
+              echo "</details>"
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
+
+          else
+            TOTAL_LINES=$(terraform show -no-color tfplan | wc -l | awk '{print $1}')
+            {
+              echo
               echo "### 📄 Plan (first ${LIMIT} lines${TOTAL_LINES:+ of ${TOTAL_LINES}})"
               terraform show -no-color tfplan | sed -n "1,${LIMIT}p"
               if [ -n "${TOTAL_LINES:-}" ] && [ "$TOTAL_LINES" -gt "$LIMIT" ]; then
                 echo
                 echo "_…truncated, total lines: $TOTAL_LINES_"
               fi
-            else
-              echo "### 📄 Plan"
-              echo "_terraform binary not available to render plan output_"
-            fi
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
           fi
-        } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" || true
+        fi 
