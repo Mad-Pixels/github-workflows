@@ -161,4 +161,4 @@ If it works locally, it works in CI — **guaranteed**:
 | Name | Description |
 |---|---|
 |**[about](https://github.com/mr-chelyshkin/about)**|VueJS static site with containerized build and AWS deployment|
-
+|**[dyno-doc](https://github.com/Mad-Pixels/go-dyno-docs)**|VueJS && Vitepress static site with docs|
